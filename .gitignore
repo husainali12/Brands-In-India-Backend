@@ -1,0 +1,17 @@
+# Environment files
+.env
+.env.*
+
+# Node modules
+node_modules/
+
+# Service secrets
+firebase-service-secret.json
+*-service-secret.json
+
+# Logs
+logs
+*.log
+
+# OS files
+.DS_Store
