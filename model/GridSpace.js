@@ -69,10 +69,23 @@ const GridSpaceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  purchasedAt: {
+    type: Date,
+    default: null,
+  },
 });
 
 GridSpaceSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
+  next();
+});
+
+
+GridSpaceSchema.pre("save", function (next) {
+  this.updatedAt = Date.now();
+  if (this.isModified('status') && this.status === 'purchased' && !this.purchasedAt) {
+    this.purchasedAt = new Date();
+  }
   next();
 });
 

@@ -3,6 +3,17 @@ require("dotenv").config({
   path: path.resolve(__dirname, "../.env"),
 });
 
+const parseKey = (key) => {
+  if (!key) return key;
+  let cleanKey = key.replace(/^["']|["']$/g, '');
+  cleanKey = cleanKey.replace(/\\n/g, '\n');
+  if (!cleanKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    console.warn('Private key does not appear to be properly formatted');
+  }
+
+  return cleanKey;
+};
+
 const config = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 5000,
@@ -23,9 +34,7 @@ const config = {
     projectId: process.env.FIREBASE_PROJECT_ID,
     apiKey: process.env.FIREBASE_API_KEY,
     privateKeyId: process.env.FIREBASE_PRIVATE_KEY_ID,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY
-      ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-      : undefined,
+    privateKey:parseKey(process.env.FIREBASE_PRIVATE_KEY),
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     clientId: process.env.FIREBASE_CLIENT_ID,
     authUri: process.env.FIREBASE_AUTH_URI,

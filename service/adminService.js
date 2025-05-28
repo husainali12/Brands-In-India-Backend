@@ -113,8 +113,22 @@ async function getGridLayoutsWithSpaces(userId, status) {
     }
     popOpts.match = { status };
   }
+   const layouts = await GridLayout.find(filter)
+    .populate(popOpts)
+    .lean();
 
-  const layouts = await GridLayout.find(filter).populate(popOpts).lean();
+  layouts.sort((a, b) => {
+    const getLatestPurchaseDate = (spaces) => {
+      const purchasedSpaces = spaces.filter(s => s.status === 'purchased' && s.purchasedAt);
+      if (purchasedSpaces.length === 0) return new Date(0);
+      return Math.max(...purchasedSpaces.map(s => new Date(s.purchasedAt)));
+    };
+
+    const aLatest = getLatestPurchaseDate(a.spaces);
+    const bLatest = getLatestPurchaseDate(b.spaces);
+    
+    return bLatest - aLatest;
+  });
 
   return layouts;
 }
