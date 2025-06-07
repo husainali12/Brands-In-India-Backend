@@ -1,8 +1,8 @@
 const crypto = require("crypto");
 const config = require("../config/config");
 
-const orderId = "order_QNH37vas8d8zAI";
-const paymentId = "pay_MOCKPAYMENT12345";
+const orderId = "order_QcSLCF0GyiRw5n";
+const paymentId = "pay_ABCdef012345";
 const keySecret = config.razorpay.keySecret;
 
 const signature = crypto

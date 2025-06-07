@@ -14,6 +14,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const biddingRoutes = require("./routes/biddingRoutes");
+const brandRoutes = require("./routes/brandRoutes");
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/bid", biddingRoutes);
+app.use("/api/brand", brandRoutes);
 
 cron.schedule('0 0 * * *', async () => {
   console.log('[Cron] Clearing expired reservations...');
