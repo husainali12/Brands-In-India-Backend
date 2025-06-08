@@ -3,6 +3,7 @@ const cloudinary = require("cloudinary").v2;
 const Razorpay = require("razorpay");
 const config = require("../config/config");
 const crypto = require("crypto");
+const Category = require("../model/category.model");
 
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
@@ -156,6 +157,7 @@ const confirmAndShift = async (req, res) => {
       typeof location.city !== "string" ||
       !location.state ||
       typeof location.state !== "string" ||
+      typeof location.address !== "string" ||
       typeof logoUrl !== "string" ||
       typeof w !== "number" ||
       typeof h !== "number"
@@ -192,7 +194,6 @@ const confirmAndShift = async (req, res) => {
         description,
         details,
         category,
-        location,
         logoUrl,
         location: locationWithCoordinates,
         totalBlocks: w * h,
@@ -294,7 +295,7 @@ const getAllBlocks = async (req, res) => {
       country,
       category,
       search,
-      sort = "orderNum", 
+      sort = "orderNum",
       order = "asc",
       page = 1,
       limit = 10,
@@ -333,8 +334,8 @@ const getAllBlocks = async (req, res) => {
 
     const sortOption = {};
     sortOption[sort] = order === "desc" ? -1 : 1;
-    
-     if (sort !== "orderNum") {
+
+    if (sort !== "orderNum") {
       sortOption["orderNum"] = 1;
     }
 
@@ -364,10 +365,41 @@ const getAllBlocks = async (req, res) => {
     });
   }
 };
+const createCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Category name is required" });
+    }
+
+    const existing = await Category.findOne({ name });
+    if (existing) {
+      return res.status(400).json({ error: "Category already exists" });
+    }
+
+    const category = await Category.create({ name });
+    res.status(201).json({ success: true, data: category });
+  } catch (err) {
+    console.error("Create category error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const getCategories = async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: categories });
+  } catch (err) {
+    console.error("Get category error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
 
 module.exports = {
   uploadLogo,
   confirmAndShift,
   getAllBlocks,
   verifyPurchase,
+  createCategory,
+  getCategories,
 };
