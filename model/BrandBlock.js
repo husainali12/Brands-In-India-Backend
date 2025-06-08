@@ -48,11 +48,11 @@ const BrandBlockSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: true,
+      // required: true,
     },
     address: {
       type: String,
-      required: [true, "Address is required"],
+      // required: [true, "Address is required"],
       trim: true,
     },
   },

@@ -157,7 +157,7 @@ const confirmAndShift = async (req, res) => {
       typeof location.city !== "string" ||
       !location.state ||
       typeof location.state !== "string" ||
-      typeof location.address !== "string" ||
+      // typeof location.address !== "string" ||
       typeof logoUrl !== "string" ||
       typeof w !== "number" ||
       typeof h !== "number"
