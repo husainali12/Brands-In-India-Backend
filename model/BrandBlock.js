@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const BrandBlockSchema = new mongoose.Schema({
   orderNum: {
     type: Number,
-    required: true
+    // required: true
   },
   brandName: {
     type: String,
@@ -111,11 +111,27 @@ const BrandBlockSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-   totalBlocks: {
+  totalBlocks: {
     type: Number,
     required: true,
     default: () => this.w * this.h,
   },
+});
+
+BrandBlockSchema.pre("save", async function (next) {
+  if (this.orderNum != null) return next();
+  try {
+    const lastDoc = await mongoose
+      .model("BrandBlock")
+      .findOne({})
+      .sort({ orderNum: -1 })
+      .select("orderNum");
+
+    this.orderNum = lastDoc ? lastDoc.orderNum + 1 : 1;
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = mongoose.model("BrandBlock", BrandBlockSchema);
