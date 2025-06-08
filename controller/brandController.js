@@ -295,6 +295,7 @@ const getAllBlocks = async (req, res) => {
       country,
       category,
       search,
+      paymentStatus = "success",
       sort = "orderNum",
       order = "asc",
       page = 1,
@@ -329,7 +330,7 @@ const getAllBlocks = async (req, res) => {
         { details: new RegExp(search, "i") },
       ];
     }
-
+    filter.paymentStatus = paymentStatus;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const sortOption = {};
