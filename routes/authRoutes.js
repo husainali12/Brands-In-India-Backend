@@ -4,7 +4,8 @@ const {
   loginUser,
   registerUser,
   forgotPassword,
-  getUserbyId
+  getUserbyId,
+  getUserByFirebaseUid,
 } = require("../controller/authController");
 const validate = require("../middleware/validate");
 const firebaseAuth = require("../middleware/firebaseAuth");
@@ -31,4 +32,9 @@ router.post(
 
 router.post("/forgot-password", firebaseAuth("any"), forgotPassword);
 router.get("/me", firebaseAuth("any"), getUserbyId);
+router.get(
+  "/by-firebase-uid/:firebaseUid",
+  firebaseAuth("any"),
+  getUserByFirebaseUid
+);
 module.exports = router;

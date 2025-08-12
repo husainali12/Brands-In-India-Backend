@@ -6,6 +6,7 @@ const {
   verifyPurchase,
   createCategory,
   getCategories,
+  getBlocksByOwner,
 } = require("../controller/brandController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
@@ -16,5 +17,6 @@ router.post("/verify-purchase", verifyPurchase);
 router.get("/blocks", getAllBlocks);
 router.post("/category", createCategory);
 router.get("/category", getCategories);
+router.get("/owner/:ownerId", firebaseAuth("any"), getBlocksByOwner);
 
 module.exports = router;

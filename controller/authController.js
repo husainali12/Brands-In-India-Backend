@@ -130,10 +130,36 @@ const getUserbyId = catchAsync(async (req, res) => {
   res.status(200).send({ data: user });
 });
 
+const getUserByFirebaseUid = catchAsync(async (req, res) => {
+  const { firebaseUid } = req.params;
+
+  if (!firebaseUid) {
+    throw new ApiError("Firebase UID is required", httpStatus.BAD_REQUEST);
+  }
+
+  const user = await authService.getUserByFirebaseUId(firebaseUid);
+
+  if (!user) {
+    throw new ApiError("User not found", httpStatus.NOT_FOUND);
+  }
+
+  res.status(200).json({
+    status: true,
+    data: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+    message: "User found successfully",
+  });
+});
+
 module.exports = {
   loginUser,
   registerUser,
   generateToken,
   forgotPassword,
   getUserbyId,
+  getUserByFirebaseUid,
 };

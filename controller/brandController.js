@@ -396,6 +396,43 @@ const getCategories = async (req, res) => {
   }
 };
 
+const getBlocksByOwner = async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+
+    // Check if the authenticated user is requesting their own blocks
+    if (req.user._id.toString() !== ownerId) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view your own blocks",
+      });
+    }
+
+    const blocks = await BrandBlock.find({
+      owner: ownerId,
+      paymentStatus: "success", // Only return successfully paid blocks
+    })
+      .select(
+        "orderNum brandName description details category location logoUrl x y w h createdAt totalAmount"
+      )
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Blocks fetched successfully",
+      data: blocks,
+      count: blocks.length,
+    });
+  } catch (err) {
+    console.error("Error in getBlocksByOwner:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error fetching blocks",
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   uploadLogo,
   confirmAndShift,
@@ -403,4 +440,5 @@ module.exports = {
   verifyPurchase,
   createCategory,
   getCategories,
+  getBlocksByOwner,
 };
