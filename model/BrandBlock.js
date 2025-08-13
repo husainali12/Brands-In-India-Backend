@@ -121,6 +121,47 @@ const BrandBlockSchema = new mongoose.Schema({
     required: true,
     default: () => this.w * this.h,
   },
+  clicks: {
+    type: Number,
+    default: 0,
+  },
+  clickDetails: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      // userEmail: {
+      //   type: String,
+      //   required: true,
+      // },
+      // userName: {
+      //   type: String,
+      //   default: null,
+      // },
+      // userPhoto: {
+      //   type: String,
+      //   default: null,
+      // },
+      clickedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      // userAgent: {
+      //   type: String,
+      //   default: null,
+      // },
+      // ipAddress: {
+      //   type: String,
+      //   default: null,
+      // },
+    },
+  ],
+  clickUrl: {
+    type: String,
+    default: null,
+  },
 });
 
 BrandBlockSchema.pre("save", async function (next) {

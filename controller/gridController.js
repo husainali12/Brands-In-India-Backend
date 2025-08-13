@@ -2,6 +2,7 @@ const catchAsync = require("../utils/catchAsync");
 const gridService = require("../service/gridService");
 const GridLayout = require("../model/GridLayout");
 const GridSpace = require("../model/GridSpace");
+const ApiError = require("../utils/ApiError");
 
 const getGridLayouts = catchAsync(async (req, res) => {
   const layouts = await gridService.getGridLayouts();

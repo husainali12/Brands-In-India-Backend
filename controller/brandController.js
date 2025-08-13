@@ -413,8 +413,13 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success", // Only return successfully paid blocks
     })
       .select(
-        "orderNum brandName description details category location logoUrl x y w h createdAt totalAmount"
+        "orderNum brandName description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails"
       )
+      .populate({
+        path: "clickDetails.userId",
+        select: "name email photoURL",
+        model: "User",
+      })
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -433,6 +438,173 @@ const getBlocksByOwner = async (req, res) => {
   }
 };
 
+const recordBrandBlockClick = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const block = await BrandBlock.findById(id);
+    if (!block) {
+      return res.status(404).json({
+        success: false,
+        message: "Brand block not found",
+      });
+    }
+
+    // Always increment the click count regardless of same day
+    block.clicks += 1;
+
+    // Check if user has already clicked today on this block
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+
+    const existingClickToday = block.clickDetails.find((click) => {
+      const clickDate = new Date(click.clickedAt);
+      clickDate.setHours(0, 0, 0, 0); // Start of click day
+      return (
+        click.userId.toString() === req.user._id.toString() &&
+        clickDate.getTime() === today.getTime()
+      );
+    });
+
+    // Only add click details if user hasn't clicked today
+    if (!existingClickToday) {
+      // Get user information from the authenticated user (MongoDB User object)
+      const userInfo = {
+        userId: req.user._id, // MongoDB ObjectId
+        // userEmail: req.user.email,
+        // userName: req.user.name || req.user.displayName || null,
+        // userPhoto: req.user.photoURL || null,
+        clickedAt: new Date(),
+        // userAgent: req.headers["user-agent"] || null,
+        // ipAddress: req.ip || req.connection.remoteAddress || null,
+      };
+
+      // Add click details to the array (only once per day)
+      block.clickDetails.push(userInfo);
+    }
+
+    await block.save();
+
+    // Return redirect URL if available
+    if (block.clickUrl) {
+      return res.status(200).json({
+        success: true,
+        redirectUrl: block.clickUrl,
+        message: existingClickToday
+          ? "Click counted (already recorded today)"
+          : "Click recorded",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: existingClickToday
+        ? "Click counted (already recorded today)"
+        : "Click recorded",
+    });
+  } catch (err) {
+    console.error("Error in recordBrandBlockClick:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error recording click",
+      error: err.message,
+    });
+  }
+};
+
+const getBrandBlockClickAnalytics = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const block = await BrandBlock.findById(id).populate({
+      path: "clickDetails.userId",
+      select: "name email photoURL",
+      model: "User",
+    });
+
+    if (!block) {
+      return res.status(404).json({
+        success: false,
+        message: "Brand block not found",
+      });
+    }
+
+    // Check if user is authorized to view analytics
+    if (
+      block.owner.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to view analytics for this brand block",
+      });
+    }
+
+    // Calculate analytics
+    const totalClicks = block.clicks;
+    const uniqueUsers = new Set(
+      block.clickDetails.map((click) => click.userId.toString())
+    ).size;
+
+    // Get recent clicks (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentClicks = block.clickDetails.filter(
+      (click) => new Date(click.clickedAt) > thirtyDaysAgo
+    );
+
+    // Group clicks by date for chart data
+    const clicksByDate = {};
+    block.clickDetails.forEach((click) => {
+      const date = new Date(click.clickedAt).toISOString().split("T")[0];
+      clicksByDate[date] = (clicksByDate[date] || 0) + 1;
+    });
+
+    // Get top users by click count
+    const userClickCounts = {};
+    block.clickDetails.forEach((click) => {
+      const userIdStr = click.userId.toString();
+      userClickCounts[userIdStr] = (userClickCounts[userIdStr] || 0) + 1;
+    });
+
+    const topUsers = Object.entries(userClickCounts)
+      .map(([userId, count]) => {
+        const userClick = block.clickDetails.find(
+          (click) => click.userId.toString() === userId
+        );
+        return {
+          userId,
+          userEmail: userClick.userId.email,
+          userName: userClick.userId.name,
+          // userPhoto: userClick.userId.photoURL,
+          clickCount: count,
+          lastClicked: userClick.clickedAt,
+        };
+      })
+      .sort((a, b) => b.clickCount - a.clickCount)
+      .slice(0, 10); // Top 10 users
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalClicks,
+        uniqueUsers,
+        recentClicks: recentClicks.length,
+        clicksByDate,
+        topUsers,
+        clickDetails: block.clickDetails.slice(-50), // Last 50 clicks
+      },
+    });
+  } catch (err) {
+    console.error("Error in getBrandBlockClickAnalytics:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error fetching analytics",
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   uploadLogo,
   confirmAndShift,
@@ -441,4 +613,6 @@ module.exports = {
   createCategory,
   getCategories,
   getBlocksByOwner,
+  recordBrandBlockClick,
+  getBrandBlockClickAnalytics,
 };
