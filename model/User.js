@@ -19,7 +19,7 @@ const UserSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      match: [/^[0-9]{10}$/, "Please add a valid phone number"],
+      match: [/^\+?[1-9]\d{1,14}$/, "Please add a valid phone number"],
     },
     firebaseUid: {
       type: String,

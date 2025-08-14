@@ -6,6 +6,7 @@ const {
   forgotPassword,
   getUserbyId,
   getUserByFirebaseUid,
+  editUserInfo,
 } = require("../controller/authController");
 const validate = require("../middleware/validate");
 const firebaseAuth = require("../middleware/firebaseAuth");
@@ -29,7 +30,7 @@ router.post(
   validate(register),
   registerUser
 );
-
+router.patch("/editUserInfo/:id", firebaseAuth("any"), editUserInfo);
 router.post("/forgot-password", firebaseAuth("any"), forgotPassword);
 router.get("/me", firebaseAuth("any"), getUserbyId);
 router.get(

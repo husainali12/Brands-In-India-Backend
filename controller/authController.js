@@ -149,9 +149,34 @@ const getUserByFirebaseUid = catchAsync(async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       role: user.role,
     },
     message: "User found successfully",
+  });
+});
+const editUserInfo = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  // Validate that the user is updating their own profile or is an admin
+  if (req.user._id.toString() !== id && req.user.role !== "admin") {
+    throw new ApiError("Unauthorized to edit this user", httpStatus.FORBIDDEN);
+  }
+
+  // Remove sensitive fields that shouldn't be updated directly
+  const { email, firebaseUid, role, ...allowedUpdates } = updateData;
+
+  const updatedUser = await authService.updateUserById(id, allowedUpdates);
+
+  if (!updatedUser) {
+    throw new ApiError("User not found", httpStatus.NOT_FOUND);
+  }
+
+  res.status(200).json({
+    status: true,
+    data: updatedUser,
+    message: "User information updated successfully",
   });
 });
 
@@ -162,4 +187,5 @@ module.exports = {
   forgotPassword,
   getUserbyId,
   getUserByFirebaseUid,
+  editUserInfo,
 };
