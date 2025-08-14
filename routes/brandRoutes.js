@@ -9,6 +9,7 @@ const {
   getBlocksByOwner,
   recordBrandBlockClick,
   getBrandBlockClickAnalytics,
+  getTotalClicksAggregation,
 } = require("../controller/brandController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
@@ -25,6 +26,11 @@ router.get(
   "/blocks/:id/analytics",
   firebaseAuth("any"),
   getBrandBlockClickAnalytics
+);
+router.get(
+  "/analytics/global-clicks",
+  firebaseAuth("admin"),
+  getTotalClicksAggregation
 );
 
 module.exports = router;

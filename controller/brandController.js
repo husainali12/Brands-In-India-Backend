@@ -131,6 +131,9 @@ const confirmAndShift = async (req, res) => {
   try {
     const {
       brandName,
+      brandContactNo,
+      brandEmailId,
+      businessRegistrationNumberGstin,
       description,
       details,
       category,
@@ -148,6 +151,9 @@ const confirmAndShift = async (req, res) => {
 
     if (
       typeof brandName !== "string" ||
+      typeof brandContactNo !== "string" ||
+      typeof brandEmailId !== "string" ||
+      typeof businessRegistrationNumberGstin !== "string" ||
       typeof description !== "string" ||
       typeof details !== "string" ||
       typeof category !== "string" ||
@@ -191,6 +197,9 @@ const confirmAndShift = async (req, res) => {
     try {
       const newBlock = new BrandBlock({
         brandName,
+        brandContactNo,
+        brandEmailId,
+        businessRegistrationNumberGstin,
         description,
         details,
         category,
@@ -274,7 +283,7 @@ const verifyPurchase = async (req, res) => {
     await reflowAllBlocks();
 
     const finalBlock = await BrandBlock.findById(blockId).select(
-      "_id orderNum brandName description details location logoUrl x y w h"
+      "_id orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details location logoUrl x y w h"
     );
 
     return res.status(200).json({
@@ -349,7 +358,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .select(
-        "orderNum brandName description details category location logoUrl x y w h createdAt paymentStatus"
+        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt paymentStatus"
       );
 
     return res.json({
@@ -413,7 +422,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success", // Only return successfully paid blocks
     })
       .select(
-        "orderNum brandName description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails"
+        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails"
       )
       .populate({
         path: "clickDetails.userId",
@@ -605,6 +614,152 @@ const getBrandBlockClickAnalytics = async (req, res) => {
   }
 };
 
+const getTotalClicksAggregation = async (req, res) => {
+  try {
+    // Check if user is admin for global analytics
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access required for global click analytics",
+      });
+    }
+
+    // Aggregate total clicks across all brand blocks
+    const totalClicksResult = await BrandBlock.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalClicks: { $sum: "$clicks" },
+          totalBlocks: { $sum: 1 },
+          totalPaidBlocks: {
+            $sum: { $cond: [{ $eq: ["$paymentStatus", "success"] }, 1, 0] },
+          },
+          averageClicksPerBlock: { $avg: "$clicks" },
+          maxClicks: { $max: "$clicks" },
+          minClicks: { $min: "$clicks" },
+        },
+      },
+    ]);
+
+    // Get clicks by category
+    const clicksByCategory = await BrandBlock.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          totalClicks: { $sum: "$clicks" },
+          blockCount: { $sum: 1 },
+          averageClicks: { $avg: "$clicks" },
+        },
+      },
+      {
+        $sort: { totalClicks: -1 },
+      },
+    ]);
+
+    // Get clicks by location (state)
+    const clicksByState = await BrandBlock.aggregate([
+      {
+        $group: {
+          _id: "$location.state",
+          totalClicks: { $sum: "$clicks" },
+          blockCount: { $sum: 1 },
+          averageClicks: { $avg: "$clicks" },
+        },
+      },
+      {
+        $sort: { totalClicks: -1 },
+      },
+    ]);
+
+    // Get top performing blocks
+    const topPerformingBlocks = await BrandBlock.find({
+      paymentStatus: "success",
+    })
+      .select("brandName category location clicks orderNum createdAt")
+      .sort({ clicks: -1 })
+      .limit(10);
+
+    // Get blocks with zero clicks
+    const zeroClickBlocks = await BrandBlock.countDocuments({
+      paymentStatus: "success",
+      clicks: 0,
+    });
+
+    // Get recent activity (blocks with clicks in last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentActivityBlocks = await BrandBlock.aggregate([
+      {
+        $match: {
+          paymentStatus: "success",
+          "clickDetails.clickedAt": { $gte: thirtyDaysAgo },
+        },
+      },
+      {
+        $project: {
+          brandName: 1,
+          category: 1,
+          clicks: 1,
+          recentClicks: {
+            $size: {
+              $filter: {
+                input: "$clickDetails",
+                cond: { $gte: ["$$this.clickedAt", thirtyDaysAgo] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $sort: { recentClicks: -1 },
+      },
+      {
+        $limit: 10,
+      },
+    ]);
+
+    // Get overall statistics
+    const overallStats = totalClicksResult[0] || {
+      totalClicks: 0,
+      totalBlocks: 0,
+      totalPaidBlocks: 0,
+      averageClicksPerBlock: 0,
+      maxClicks: 0,
+      minClicks: 0,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Global click analytics retrieved successfully",
+      data: {
+        overall: {
+          totalClicks: overallStats.totalClicks,
+          totalBlocks: overallStats.totalBlocks,
+          totalPaidBlocks: overallStats.totalPaidBlocks,
+          averageClicksPerBlock:
+            Math.round(overallStats.averageClicksPerBlock * 100) / 100,
+          maxClicks: overallStats.maxClicks,
+          minClicks: overallStats.minClicks,
+          zeroClickBlocks,
+          activeBlocks: overallStats.totalPaidBlocks - zeroClickBlocks,
+        },
+        byCategory: clicksByCategory,
+        byState: clicksByState,
+        topPerformingBlocks,
+        recentActivity: recentActivityBlocks,
+      },
+    });
+  } catch (err) {
+    console.error("Error in getTotalClicksAggregation:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error fetching global click analytics",
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   uploadLogo,
   confirmAndShift,
@@ -615,4 +770,5 @@ module.exports = {
   getBlocksByOwner,
   recordBrandBlockClick,
   getBrandBlockClickAnalytics,
+  getTotalClicksAggregation,
 };

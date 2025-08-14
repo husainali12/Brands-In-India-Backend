@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const validator = require("validator");
 const BrandBlockSchema = new mongoose.Schema({
   orderNum: {
     type: Number,
@@ -8,6 +9,24 @@ const BrandBlockSchema = new mongoose.Schema({
     type: String,
     required: [true, "Brand name is required"],
     trim: true,
+  },
+  brandContactNo: {
+    type: String,
+    validate: [validator.isMobilePhone, "Please provide correct phone number!"],
+    unique: true,
+  },
+  brandEmailId: {
+    type: String,
+    // required: [true, "Please add an email"],
+    unique: true,
+    match: [
+      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      "Please add a valid email",
+    ],
+  },
+  businessRegistrationNumberGstin: {
+    type: String,
+    // required: [true, "GST number is  required"],
   },
   description: {
     type: String,
