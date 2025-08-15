@@ -21,6 +21,10 @@ const UserSchema = new mongoose.Schema(
       type: String,
       match: [/^\+?[1-9]\d{1,14}$/, "Please add a valid phone number"],
     },
+    photo: {
+      type: String,
+      // required: [true, "Photo URL is required"],
+    },
     firebaseUid: {
       type: String,
       required: true,

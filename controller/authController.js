@@ -5,6 +5,7 @@ const config = require("../config/config");
 const fetch = require("node-fetch");
 const httpStatus = require("http-status");
 const ApiError = require("../utils/ApiError");
+const cloudinary = require("cloudinary").v2;
 
 const createNewUserObject = (newUser, role = "user") => ({
   email: newUser.email,
@@ -150,9 +151,62 @@ const getUserByFirebaseUid = catchAsync(async (req, res) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      photo: user.photo,
       role: user.role,
     },
     message: "User found successfully",
+  });
+});
+const uploadProfilePhoto = catchAsync(async (req, res) => {
+  // console.log(req.files);
+  if (!req.files || !req.files.photo) {
+    throw new ApiError("No file provided", httpStatus.BAD_REQUEST);
+  }
+
+  const file = req.files.photo;
+
+  // Validate file type - only images allowed
+  if (!file.mimetype.startsWith("image")) {
+    throw new ApiError("Please upload an image file", httpStatus.BAD_REQUEST);
+  }
+
+  // Validate file size - max 5MB
+  if (file.size > 5 * 1024 * 1024) {
+    throw new ApiError(
+      "Please upload an image less than 5MB",
+      httpStatus.BAD_REQUEST
+    );
+  }
+
+  // Upload to Cloudinary
+  const result = await cloudinary.uploader.upload(file.tempFilePath, {
+    folder: "profile_photos",
+    resource_type: "image",
+    width: 400,
+    height: 400,
+    crop: "fill",
+    gravity: "face",
+  });
+
+  // Update user's profile photo in database
+  const updatedUser = await authService.updateUserById(req.user._id, {
+    photo: result.secure_url,
+  });
+
+  if (!updatedUser) {
+    throw new ApiError(
+      "Failed to update user profile",
+      httpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+
+  res.status(200).json({
+    status: true,
+    data: {
+      photoUrl: result.secure_url,
+      user: updatedUser,
+    },
+    message: "Profile photo uploaded successfully",
   });
 });
 const editUserInfo = catchAsync(async (req, res, next) => {
@@ -188,4 +242,5 @@ module.exports = {
   getUserbyId,
   getUserByFirebaseUid,
   editUserInfo,
+  uploadProfilePhoto,
 };
