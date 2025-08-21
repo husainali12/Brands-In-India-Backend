@@ -630,6 +630,15 @@ const getTotalClicksAggregation = async (req, res) => {
         $group: {
           _id: null,
           totalClicks: { $sum: "$clicks" },
+          totalPurchasedTiles: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "success"] },
+                "$totalBlocks",
+                0,
+              ],
+            },
+          },
           totalBlocks: { $sum: 1 },
           totalPaidBlocks: {
             $sum: { $cond: [{ $eq: ["$paymentStatus", "success"] }, 1, 0] },
@@ -722,6 +731,7 @@ const getTotalClicksAggregation = async (req, res) => {
     // Get overall statistics
     const overallStats = totalClicksResult[0] || {
       totalClicks: 0,
+      totalPurchasedTiles: 0,
       totalBlocks: 0,
       totalPaidBlocks: 0,
       averageClicksPerBlock: 0,
@@ -735,6 +745,7 @@ const getTotalClicksAggregation = async (req, res) => {
       data: {
         overall: {
           totalClicks: overallStats.totalClicks,
+          totalPurchasedTiles: overallStats.totalPurchasedTiles,
           totalBlocks: overallStats.totalBlocks,
           totalPaidBlocks: overallStats.totalPaidBlocks,
           averageClicksPerBlock:
