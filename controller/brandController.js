@@ -446,6 +446,93 @@ const getBlocksByOwner = async (req, res) => {
     });
   }
 };
+const updateBlocksById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const block = await BrandBlock.findById(id);
+    if (!block) {
+      return res.status(404).json({ error: "Block not found." });
+    }
+
+    // Only owner or admin can update
+    if (
+      block.owner.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({
+        error: "Not authorized to update this block.",
+      });
+    }
+
+    // Handle optional logo file upload
+    let newLogoUrl = block.logoUrl;
+    if (req.files && req.files.file) {
+      const file = req.files.file;
+      if (!file.mimetype.startsWith("image")) {
+        return res.status(400).json({ error: "Please upload an image file." });
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return res
+          .status(400)
+          .json({ error: "Please upload an image less than 10MB." });
+      }
+      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+        folder: "brand_grids",
+        resource_type: "image",
+      });
+      newLogoUrl = result.secure_url;
+    }
+
+    // Prepare updates (only update fields that were sent in body)
+    const {
+      brandName,
+      brandContactNo,
+      brandEmailId,
+      businessRegistrationNumberGstin,
+      description,
+      details,
+      category,
+      location,
+    } = req.body;
+
+    const updates = {};
+
+    if (brandName) updates.brandName = brandName;
+    if (brandContactNo) updates.brandContactNo = brandContactNo;
+    if (brandEmailId) updates.brandEmailId = brandEmailId;
+    if (businessRegistrationNumberGstin)
+      updates.businessRegistrationNumberGstin = businessRegistrationNumberGstin;
+    if (description) updates.description = description;
+    if (details) updates.details = details;
+    if (category) updates.category = category;
+    if (location && typeof location === "object") {
+      updates.location = {
+        ...block.location.toObject(), // preserve existing fields
+        ...location, // override with new values
+      };
+    }
+    if (newLogoUrl) updates.logoUrl = newLogoUrl;
+
+    const updatedBlock = await BrandBlock.findByIdAndUpdate(id, updates, {
+      new: true,
+      runValidators: true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Block updated successfully",
+      data: updatedBlock,
+    });
+  } catch (err) {
+    console.error("Error in updateBlocksById:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error updating block",
+      error: err.message,
+    });
+  }
+};
 
 const recordBrandBlockClick = async (req, res) => {
   try {
@@ -782,4 +869,5 @@ module.exports = {
   recordBrandBlockClick,
   getBrandBlockClickAnalytics,
   getTotalClicksAggregation,
+  updateBlocksById,
 };

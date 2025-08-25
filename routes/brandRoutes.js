@@ -10,6 +10,7 @@ const {
   recordBrandBlockClick,
   getBrandBlockClickAnalytics,
   getTotalClicksAggregation,
+  updateBlocksById,
 } = require("../controller/brandController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
@@ -21,6 +22,7 @@ router.get("/blocks", getAllBlocks);
 router.post("/category", createCategory);
 router.get("/category", getCategories);
 router.get("/owner/:ownerId", firebaseAuth("any"), getBlocksByOwner);
+router.patch("/brand/:id", firebaseAuth("any"), updateBlocksById);
 router.post("/blocks/:id/click", firebaseAuth("any"), recordBrandBlockClick);
 router.get(
   "/blocks/:id/analytics",
