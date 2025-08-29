@@ -358,13 +358,18 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .select(
-        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt paymentStatus"
-      );
+        "orderNum brandName brandContactNo brandEmailId totalAmount totalBlocks businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
+      )
+      .populate("owner", "name email");
 
     return res.json({
       success: true,
       message: "Blocks fetched successfully",
       data: blocks,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
     console.error("Error in getAllBlocks:", err);
