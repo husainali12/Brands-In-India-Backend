@@ -308,7 +308,7 @@ const getAllBlocks = async (req, res) => {
       sort = "orderNum",
       order = "asc",
       page = 1,
-      limit = 10,
+      limit = 100,
     } = req.query;
 
     const filter = {};
