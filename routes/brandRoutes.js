@@ -11,6 +11,7 @@ const {
   getBrandBlockClickAnalytics,
   getTotalClicksAggregation,
   updateBlocksById,
+  getTimeSeriesAnalytics,
 } = require("../controller/brandController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
@@ -33,6 +34,11 @@ router.get(
   "/analytics/global-clicks",
   firebaseAuth("admin"),
   getTotalClicksAggregation
+);
+router.get(
+  "/analytics/time-series",
+  firebaseAuth("admin"),
+  getTimeSeriesAnalytics
 );
 
 module.exports = router;

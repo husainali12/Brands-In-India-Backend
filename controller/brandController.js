@@ -862,7 +862,98 @@ const getTotalClicksAggregation = async (req, res) => {
     });
   }
 };
+const getTimeSeriesAnalytics = async (req, res) => {
+  try {
+    const { range = "monthly", month } = req.query;
 
+    let groupId = {};
+    let dateExpression = null;
+    let dateFormat = "";
+    const matchStage = {};
+
+    // If user passed ?month=YYYY-MM
+    if (month && range === "monthly") {
+      const [year, monthNum] = month.split("-").map(Number);
+      const start = new Date(year, monthNum - 1, 1);
+      const end = new Date(year, monthNum, 1); // next month
+      matchStage.createdAt = { $gte: start, $lt: end };
+    }
+
+    if (range === "yearly") {
+      groupId = { year: { $year: "$createdAt" } };
+      dateExpression = { $dateFromParts: { year: "$_id.year" } };
+      dateFormat = "%Y";
+    } else if (range === "monthly") {
+      groupId = {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" },
+      };
+      dateExpression = {
+        $dateFromParts: { year: "$_id.year", month: "$_id.month" },
+      };
+      dateFormat = "%Y-%m";
+    } else if (range === "weekly") {
+      groupId = {
+        year: { $year: "$createdAt" },
+        week: { $week: "$createdAt" },
+      };
+      dateExpression = {
+        $dateFromParts: { isoWeekYear: "$_id.year", isoWeek: "$_id.week" },
+      };
+      dateFormat = "%G-W%V"; // ISO week-year
+    }
+
+    const pipeline = [];
+
+    if (Object.keys(matchStage).length) {
+      pipeline.push({ $match: matchStage });
+    }
+
+    pipeline.push(
+      {
+        $group: {
+          _id: groupId,
+          totalPurchasedTiles: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "success"] },
+                "$totalBlocks",
+                0,
+              ],
+            },
+          },
+          revenue: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "success"] },
+                "$totalAmount",
+                0,
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+      {
+        $project: {
+          _id: 0,
+          name: { $dateToString: { format: dateFormat, date: dateExpression } },
+          purchased: "$totalPurchasedTiles",
+          revenue: "$revenue",
+        },
+      }
+    );
+
+    const data = await BrandBlock.aggregate(pipeline);
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch analytics" });
+  }
+};
 module.exports = {
   uploadLogo,
   confirmAndShift,
@@ -875,4 +966,5 @@ module.exports = {
   getBrandBlockClickAnalytics,
   getTotalClicksAggregation,
   updateBlocksById,
+  getTimeSeriesAnalytics,
 };
