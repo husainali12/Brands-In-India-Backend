@@ -862,23 +862,124 @@ const getTotalClicksAggregation = async (req, res) => {
     });
   }
 };
+const getSuccessfulCreatedAt = async (req, res) => {
+  try {
+    const data = await BrandBlock.aggregate([
+      {
+        $match: { paymentStatus: "success" },
+      },
+      {
+        $facet: {
+          yearly: [
+            {
+              $group: {
+                _id: { year: { $year: "$createdAt" } },
+              },
+            },
+            { $sort: { "_id.year": -1 } },
+            {
+              $project: {
+                _id: 0,
+                year: "$_id.year",
+              },
+            },
+          ],
+          monthly: [
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$createdAt" },
+                  month: { $month: "$createdAt" },
+                },
+              },
+            },
+            { $sort: { "_id.year": -1, "_id.month": -1 } },
+            {
+              $project: {
+                _id: 0,
+                year: "$_id.year",
+                month: "$_id.month",
+              },
+            },
+          ],
+          weekly: [
+            {
+              $group: {
+                _id: {
+                  year: { $isoWeekYear: "$createdAt" }, // ISO year
+                  week: { $isoWeek: "$createdAt" }, // ISO week
+                },
+              },
+            },
+            { $sort: { "_id.year": -1, "_id.week": -1 } },
+            {
+              $project: {
+                _id: 0,
+                year: "$_id.year",
+                week: "$_id.week",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: data[0], // because facet wraps results in array
+    });
+  } catch (err) {
+    console.error("Error fetching createdAt groupings:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error fetching createdAt data",
+      error: err.message,
+    });
+  }
+};
 const getTimeSeriesAnalytics = async (req, res) => {
   try {
-    const { range = "monthly", month } = req.query;
+    const { range = "monthly", year, month, week } = req.query;
 
     let groupId = {};
     let dateExpression = null;
     let dateFormat = "";
     const matchStage = {};
 
-    // If user passed ?month=YYYY-MM
-    if (month && range === "monthly") {
-      const [year, monthNum] = month.split("-").map(Number);
-      const start = new Date(year, monthNum - 1, 1);
-      const end = new Date(year, monthNum, 1); // next month
+    // 🎯 YEARLY filter
+    if (year && range === "yearly") {
+      const start = new Date(Number(year), 0, 1);
+      const end = new Date(Number(year) + 1, 0, 1);
       matchStage.createdAt = { $gte: start, $lt: end };
     }
 
+    // 🎯 MONTHLY filter
+    if (month && range === "monthly") {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 1); // next month
+      matchStage.createdAt = { $gte: start, $lt: end };
+    }
+
+    // 🎯 WEEKLY filter (ISO week, e.g. 2025-W35)
+    if (week && range === "weekly") {
+      const [yearStr, weekStr] = week.split("-W");
+      const y = Number(yearStr);
+      const w = Number(weekStr);
+
+      // rough start of that week
+      const start = new Date(y, 0, 1 + (w - 1) * 7);
+      // adjust back to Monday
+      while (start.getDay() !== 1) {
+        start.setDate(start.getDate() - 1);
+      }
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+
+      matchStage.createdAt = { $gte: start, $lt: end };
+    }
+
+    // 🎯 Define grouping based on range
     if (range === "yearly") {
       groupId = { year: { $year: "$createdAt" } };
       dateExpression = { $dateFromParts: { year: "$_id.year" } };
@@ -894,15 +995,19 @@ const getTimeSeriesAnalytics = async (req, res) => {
       dateFormat = "%Y-%m";
     } else if (range === "weekly") {
       groupId = {
-        year: { $year: "$createdAt" },
-        week: { $week: "$createdAt" },
+        year: { $isoWeekYear: "$createdAt" },
+        week: { $isoWeek: "$createdAt" },
       };
       dateExpression = {
-        $dateFromParts: { isoWeekYear: "$_id.year", isoWeek: "$_id.week" },
+        $dateFromParts: {
+          isoWeekYear: "$_id.year",
+          isoWeek: "$_id.week",
+        },
       };
-      dateFormat = "%G-W%V"; // ISO week-year
+      dateFormat = "%G-W%V"; // Example: 2025-W35
     }
 
+    // 🎯 Build pipeline
     const pipeline = [];
 
     if (Object.keys(matchStage).length) {
@@ -967,4 +1072,5 @@ module.exports = {
   getTotalClicksAggregation,
   updateBlocksById,
   getTimeSeriesAnalytics,
+  getSuccessfulCreatedAt,
 };

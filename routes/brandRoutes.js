@@ -12,6 +12,7 @@ const {
   getTotalClicksAggregation,
   updateBlocksById,
   getTimeSeriesAnalytics,
+  getSuccessfulCreatedAt,
 } = require("../controller/brandController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
@@ -37,8 +38,14 @@ router.get(
 );
 router.get(
   "/analytics/time-series",
-  firebaseAuth("admin"),
+  // firebaseAuth("admin"),
   getTimeSeriesAnalytics
+);
+
+router.get(
+  "/analytics/successful-created-at",
+  // firebaseAuth("admin"),
+  getSuccessfulCreatedAt
 );
 
 module.exports = router;
