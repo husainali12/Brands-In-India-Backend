@@ -130,7 +130,14 @@ const getUserbyId = catchAsync(async (req, res) => {
   }
   res.status(200).send({ data: user });
 });
-
+const getUsers = catchAsync(async (req, res) => {
+  const users = await authService.getUsers(req, res);
+  res.status(200).json({
+    status: true,
+    data: users,
+    message: "Users fetched successfully",
+  });
+});
 const getUserByFirebaseUid = catchAsync(async (req, res) => {
   const { firebaseUid } = req.params;
 
@@ -243,4 +250,5 @@ module.exports = {
   getUserByFirebaseUid,
   editUserInfo,
   uploadProfilePhoto,
+  getUsers,
 };

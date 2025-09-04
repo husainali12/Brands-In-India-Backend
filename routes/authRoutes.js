@@ -8,6 +8,7 @@ const {
   getUserByFirebaseUid,
   editUserInfo,
   uploadProfilePhoto,
+  getUsers,
 } = require("../controller/authController");
 const validate = require("../middleware/validate");
 const firebaseAuth = require("../middleware/firebaseAuth");
@@ -35,6 +36,7 @@ router.patch("/editUserInfo/:id", firebaseAuth("any"), editUserInfo);
 router.post("/uploadProfilePhoto", firebaseAuth("any"), uploadProfilePhoto);
 router.post("/forgot-password", firebaseAuth("any"), forgotPassword);
 router.get("/me", firebaseAuth("any"), getUserbyId);
+router.get("/users", firebaseAuth("admin"), getUsers);
 router.get(
   "/by-firebase-uid/:firebaseUid",
   firebaseAuth("any"),
