@@ -9,6 +9,13 @@ const {
   editUserInfo,
   uploadProfilePhoto,
   getUsers,
+  blockUser,
+  unblockUser,
+  // deleteUser,
+  // verifyUser,
+  // unverifyUser,
+  // activateUser,
+  // deactivateUser,
 } = require("../controller/authController");
 const validate = require("../middleware/validate");
 const firebaseAuth = require("../middleware/firebaseAuth");
@@ -42,4 +49,12 @@ router.get(
   firebaseAuth("any"),
   getUserByFirebaseUid
 );
+router.patch("/block-user/:id", firebaseAuth("admin"), blockUser);
+router.patch("/unblock-user/:id", firebaseAuth("admin"), unblockUser);
+// router.patch("/delete-user/:id", firebaseAuth("admin"), deleteUser);
+// router.patch("/verify-user/:id", firebaseAuth("admin"), verifyUser);
+// router.patch("/unverify-user/:id", firebaseAuth("admin"), unverifyUser);
+// router.patch("/activate-user/:id", firebaseAuth("admin"), activateUser);
+// router.patch("/deactivate-user/:id", firebaseAuth("admin"), deactivateUser);
+
 module.exports = router;

@@ -240,7 +240,55 @@ const editUserInfo = catchAsync(async (req, res, next) => {
     message: "User information updated successfully",
   });
 });
-
+const blockUser = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const updatedUser = await authService.updateUserById(id, { isBlocked: true });
+  res.status(200).json({
+    status: true,
+    data: updatedUser,
+    message: "User blocked successfully",
+  });
+});
+const unblockUser = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const updatedUser = await authService.updateUserById(id, {
+    isBlocked: false,
+  });
+  res.status(200).json({
+    status: true,
+    data: updatedUser,
+    message: "User unblocked successfully",
+  });
+});
+// const deleteUser = catchAsync(async (req, res) => {
+//   const { id } = req.params;
+//   const updatedUser = await authService.updateUserById(id, { isDeleted: true });
+//   res.status(200).json({ data: updatedUser });
+// });
+// const verifyUser = catchAsync(async (req, res) => {
+//   const { id } = req.params;
+//   const updatedUser = await authService.updateUserById(id, {
+//     isVerified: true,
+//   });
+//   res.status(200).json({ data: updatedUser });
+// });
+// const unverifyUser = catchAsync(async (req, res) => {
+//   const { id } = req.params;
+//   const updatedUser = await authService.updateUserById(id, {
+//     isVerified: false,
+//   });
+//   res.status(200).json({ data: updatedUser });
+// });
+// const activateUser = catchAsync(async (req, res) => {
+//   const { id } = req.params;
+//   const updatedUser = await authService.updateUserById(id, { isActive: true });
+//   res.status(200).json({ data: updatedUser });
+// });
+// const deactivateUser = catchAsync(async (req, res) => {
+//   const { id } = req.params;
+//   const updatedUser = await authService.updateUserById(id, { isActive: false });
+//   res.status(200).json({ data: updatedUser });
+// });
 module.exports = {
   loginUser,
   registerUser,
@@ -251,4 +299,11 @@ module.exports = {
   editUserInfo,
   uploadProfilePhoto,
   getUsers,
+  blockUser,
+  unblockUser,
+  // deleteUser,
+  // verifyUser,
+  // unverifyUser,
+  // activateUser,
+  // deactivateUser,
 };

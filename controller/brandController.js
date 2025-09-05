@@ -360,7 +360,7 @@ const getAllBlocks = async (req, res) => {
       .select(
         "orderNum brandName brandContactNo brandEmailId totalAmount totalBlocks businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
       )
-      .populate("owner", "name email");
+      .populate("owner", "name email isBlocked");
 
     return res.json({
       success: true,
