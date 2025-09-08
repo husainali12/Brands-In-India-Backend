@@ -160,6 +160,7 @@ const getUserByFirebaseUid = catchAsync(async (req, res) => {
       phone: user.phone,
       photo: user.photo,
       isBlocked: user.isBlocked,
+      blockReasons: user.blockReasons,
       role: user.role,
     },
     message: "User found successfully",
