@@ -42,6 +42,7 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    blockReasons: [{ type: String }],
     // isDeleted: {
     //   type: Boolean,
     //   default: false,

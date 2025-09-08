@@ -159,6 +159,7 @@ const getUserByFirebaseUid = catchAsync(async (req, res) => {
       email: user.email,
       phone: user.phone,
       photo: user.photo,
+      isBlocked: user.isBlocked,
       role: user.role,
     },
     message: "User found successfully",
@@ -242,7 +243,11 @@ const editUserInfo = catchAsync(async (req, res, next) => {
 });
 const blockUser = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const updatedUser = await authService.updateUserById(id, { isBlocked: true });
+  const { reasons } = req.body;
+  const updatedUser = await authService.updateUserById(id, {
+    isBlocked: true,
+    blockReasons: reasons, // link block reasons
+  });
   res.status(200).json({
     status: true,
     data: updatedUser,

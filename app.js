@@ -6,7 +6,7 @@ const dotenv = require("dotenv");
 const path = require("path");
 const fileUpload = require("express-fileupload");
 const cron = require("node-cron");
-const GridSpace   = require("./model/GridSpace");
+const GridSpace = require("./model/GridSpace");
 
 const authRoutes = require("./routes/authRoutes");
 const gridRoutes = require("./routes/gridRoutes");
@@ -15,7 +15,7 @@ const uploadRoutes = require("./routes/uploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const biddingRoutes = require("./routes/biddingRoutes");
 const brandRoutes = require("./routes/brandRoutes");
-
+const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
 dotenv.config();
 
 const app = express();
@@ -46,20 +46,20 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/bid", biddingRoutes);
 app.use("/api/brand", brandRoutes);
+app.use("/api/blockReasons", blockReasonsRoutes);
 
-cron.schedule('0 0 * * *', async () => {
-  console.log('[Cron] Clearing expired reservations...');
+cron.schedule("0 0 * * *", async () => {
+  console.log("[Cron] Clearing expired reservations...");
   try {
     const result = await GridSpace.updateMany(
-      { status: 'reserved', reservationExpiresAt: { $lt: new Date() } },
-      { $set: { status: 'available', owner: null, reservationExpiresAt: null } }
+      { status: "reserved", reservationExpiresAt: { $lt: new Date() } },
+      { $set: { status: "available", owner: null, reservationExpiresAt: null } }
     );
     console.log(`[Cron] Expired reservations cleared: ${result.modifiedCount}`);
   } catch (e) {
-    console.error('[Cron] Error clearing expired reservations:', e);
+    console.error("[Cron] Error clearing expired reservations:", e);
   }
 });
-
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

@@ -46,9 +46,9 @@ const firebaseAuth =
             );
           }
 
-          if (user.isBlocked) {
-            reject(new ApiError("User is blocked", httpStatus.FORBIDDEN));
-          }
+          // if (user.isBlocked) {
+          //   reject(new ApiError("User is blocked", httpStatus.FORBIDDEN));
+          // }
 
           if (user.isDeleted) {
             reject(new ApiError("User doesn't exist anymore", httpStatus.GONE));
