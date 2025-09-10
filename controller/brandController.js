@@ -4,7 +4,7 @@ const Razorpay = require("razorpay");
 const config = require("../config/config");
 const crypto = require("crypto");
 const Category = require("../model/category.model");
-
+const mongoose = require("mongoose");
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
   key_secret: config.razorpay.keySecret,
@@ -413,18 +413,19 @@ const getCategories = async (req, res) => {
 const getBlocksByOwner = async (req, res) => {
   try {
     const { ownerId } = req.params;
-
-    // Check if the authenticated user is requesting their own blocks
+    const { page = 1, limit = 3 } = req.query;
     if (req.user._id.toString() !== ownerId) {
       return res.status(403).json({
         success: false,
         message: "You can only view your own blocks",
       });
     }
-
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 3;
+    const skip = (pageNum - 1) * limitNum;
     const blocks = await BrandBlock.find({
       owner: ownerId,
-      paymentStatus: "success", // Only return successfully paid blocks
+      paymentStatus: "success",
     })
       .select(
         "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails"
@@ -434,13 +435,59 @@ const getBlocksByOwner = async (req, res) => {
         select: "name email photoURL",
         model: "User",
       })
-      .sort({ createdAt: -1 });
-
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+    // Count total
+    const totalBlocks = await BrandBlock.countDocuments({
+      owner: ownerId,
+      paymentStatus: "success",
+    });
+    const totalClicks = await BrandBlock.aggregate([
+      {
+        $match: {
+          owner: new mongoose.Types.ObjectId(ownerId),
+          paymentStatus: "success",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalClicks: { $sum: "$clicks" },
+        },
+      },
+    ]);
+    let clickRows = [];
+    clickRows = blocks.flatMap((block) =>
+      (block.clickDetails || []).map((click) => ({
+        blockId: block._id,
+        brandName: block.brandName,
+        logoUrl: block.logoUrl,
+        click,
+      }))
+    );
+    clickRows.sort((a, b) => {
+      const aTime = a.click?.clickedAt
+        ? new Date(a.click.clickedAt).getTime()
+        : 0;
+      const bTime = b.click?.clickedAt
+        ? new Date(b.click.clickedAt).getTime()
+        : 0;
+      return bTime - aTime;
+    });
+    const totalPages = Math.ceil(totalBlocks / limitNum);
     return res.status(200).json({
       success: true,
       message: "Blocks fetched successfully",
+      page: pageNum,
+      limit: limitNum,
+      totalBlocks,
+      totalPages,
+      count: blocks.length,
       data: blocks,
       count: blocks.length,
+      totalClicks: totalClicks[0]?.totalClicks || 0,
+      clickRows,
     });
   } catch (err) {
     console.error("Error in getBlocksByOwner:", err);
