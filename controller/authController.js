@@ -259,6 +259,7 @@ const unblockUser = catchAsync(async (req, res) => {
   const { id } = req.params;
   const updatedUser = await authService.updateUserById(id, {
     isBlocked: false,
+    blockReasons: [],
   });
   res.status(200).json({
     status: true,
