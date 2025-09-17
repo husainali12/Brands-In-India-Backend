@@ -139,6 +139,8 @@ const confirmAndShift = async (req, res) => {
       category,
       location,
       logoUrl,
+      facebookUrl,
+      instagramUrl,
       w,
       h,
       longitude,
@@ -156,6 +158,8 @@ const confirmAndShift = async (req, res) => {
       typeof businessRegistrationNumberGstin !== "string" ||
       typeof description !== "string" ||
       typeof details !== "string" ||
+      typeof facebookUrl !== "string" ||
+      typeof instagramUrl !== "string" ||
       typeof category !== "string" ||
       !location ||
       typeof location !== "object" ||
@@ -204,6 +208,8 @@ const confirmAndShift = async (req, res) => {
         details,
         category,
         logoUrl,
+        facebookUrl,
+        instagramUrl,
         location: locationWithCoordinates,
         totalBlocks: w * h,
         w,
@@ -358,7 +364,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .select(
-        "orderNum brandName brandContactNo brandEmailId totalAmount totalBlocks businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl instagramUrl totalAmount totalBlocks businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
       )
       .populate("owner", "name email isBlocked");
 
@@ -457,6 +463,20 @@ const getBlocksByOwner = async (req, res) => {
         },
       },
     ]);
+    const totalTilesOwned = await BrandBlock.aggregate([
+      {
+        $match: {
+          owner: new mongoose.Types.ObjectId(ownerId),
+          paymentStatus: "success",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalTilesOwned: { $sum: "$totalBlocks" },
+        },
+      },
+    ]);
     let clickRows = [];
     clickRows = blocks.flatMap((block) =>
       (block.clickDetails || []).map((click) => ({
@@ -482,6 +502,7 @@ const getBlocksByOwner = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalBlocks,
+      totalTilesOwned,
       totalPages,
       count: blocks.length,
       data: blocks,

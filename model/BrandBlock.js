@@ -15,6 +15,18 @@ const BrandBlockSchema = new mongoose.Schema({
     validate: [validator.isMobilePhone, "Please provide correct phone number!"],
     unique: true,
   },
+  // locationUrl: {
+  //   type: String,
+  //   default: "https://www.google.com/maps/",
+  // },
+  facebookUrl: {
+    type: String,
+    default: "https://www.facebook.com/",
+  },
+  instagramUrl: {
+    type: String,
+    default: "https://www.instagram.com/",
+  },
   brandEmailId: {
     type: String,
     // required: [true, "Please add an email"],
