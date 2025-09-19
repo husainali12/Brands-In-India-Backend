@@ -301,7 +301,7 @@ const verifyPurchase = async (req, res) => {
     return res.status(500).json({ error: "Server error verifying payment." });
   }
 };
-
+// order history fields for admin/user panel
 const getAllBlocks = async (req, res) => {
   try {
     const {
@@ -364,7 +364,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl instagramUrl totalAmount totalBlocks businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
       )
       .populate("owner", "name email isBlocked");
 
