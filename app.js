@@ -16,6 +16,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const biddingRoutes = require("./routes/biddingRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
+const upComingUserRoutes = require("./routes/UpComingUserRoutes");
 dotenv.config();
 
 const app = express();
@@ -47,6 +48,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/bid", biddingRoutes);
 app.use("/api/brand", brandRoutes);
 app.use("/api/blockReasons", blockReasonsRoutes);
+app.use("/api/upcoming-user", upComingUserRoutes);
 
 cron.schedule("0 0 * * *", async () => {
   console.log("[Cron] Clearing expired reservations...");
