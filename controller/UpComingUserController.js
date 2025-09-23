@@ -10,7 +10,10 @@ const createUpComingUser = catchAsync(async (req, res) => {
   const existingUser = await UpComingUser.findOne({ email });
   //   console.log(existingUser);
   if (existingUser) {
-    throw new ApiError("User with this email already exists", 400);
+    throw new ApiError(
+      "We already have your email! You will be notified when we launch!",
+      400
+    );
   }
   const newUser = await UpComingUser.create({ name, email });
   res.status(201).json({ success: true, data: newUser });
