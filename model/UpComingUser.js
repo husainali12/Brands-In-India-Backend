@@ -17,6 +17,10 @@ const UpComingUserSchema = new mongoose.Schema(
         "Please add a valid email",
       ],
     },
+    phone: {
+      type: String,
+      match: [/^\+?[1-9]\d{1,14}$/, "Please add a valid phone number"],
+    },
   },
   { timestamps: true }
 );
