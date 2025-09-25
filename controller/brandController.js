@@ -250,6 +250,88 @@ const confirmAndShift = async (req, res) => {
   }
 };
 
+const updateBlockWithCoords = async (req, res) => {
+  try {
+    const { blockId } = req.params;
+    const { logoUrl, x, y, w, h } = req.body;
+    const unitPrice = 500;
+    const block = await BrandBlock.findById(blockId);
+    if (!block) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Block not found" });
+    }
+    const oldBlockCount = block.totalBlocks;
+    const newBlockCount = w * h;
+    if (newBlockCount > 10) {
+      return res.status(400).json({
+        success: false,
+        message: "A brand block cannot exceed 10 tiles",
+      });
+    } else if (newBlockCount <= oldBlockCount) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "You have already selected " +
+          block.totalBlocks +
+          " tiles, To purchase additional tiles, please select more than " +
+          block.totalBlocks +
+          " tiles, but not exceeding 10 tiles in total. Thankyou!",
+      });
+    }
+    let extraBlocks = 0;
+    let extraPrice = 0;
+    console.log("Old block count:", oldBlockCount);
+    console.log("New block count:", newBlockCount);
+    let razorpayOrder = null;
+    if (newBlockCount > oldBlockCount) {
+      extraBlocks = newBlockCount - oldBlockCount;
+      extraPrice = extraBlocks * unitPrice;
+      razorpayOrder = await razorpay.orders.create({
+        amount: extraPrice * 100,
+        currency: "INR",
+        receipt: `update_receipt_${Date.now()}`,
+        payment_capture: 1,
+      });
+      console.log("Created razorpay order:", razorpayOrder);
+      block.orderId = razorpayOrder.id;
+      block.paymentStatus = "initiated";
+      // block.totalAmount = (block.totalAmount || 0) + extraPrice;
+      block.pendingAmount = extraPrice;
+    }
+
+    block.logoUrl = logoUrl || block.logoUrl;
+    block.x = x ?? block.x;
+    block.y = y ?? block.y;
+    block.w = w ?? block.w;
+    block.h = h ?? block.h;
+    block.totalBlocks = newBlockCount;
+    await block.save();
+    return res.status(200).json({
+      success: true,
+      message: "Block updated successfully",
+      data: {
+        updatedBlock: block,
+        blockId,
+        extraBlocks,
+        extraPrice,
+        payableNow: extraPrice,
+        order: razorpayOrder
+          ? {
+              id: razorpayOrder.id,
+              amount: razorpayOrder.amount,
+              currency: razorpayOrder.currency,
+              receipt: razorpayOrder.receipt,
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    console.error("Error in initiatePurchase:", error);
+    return res.status(500).json({ error: "Server error initiating purchase." });
+  }
+};
+
 const verifyPurchase = async (req, res) => {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature, blockId } =
@@ -283,7 +365,13 @@ const verifyPurchase = async (req, res) => {
     block.paymentStatus = "success";
     const razorpayOrder = await razorpay.orders.fetch(razorpayOrderId);
     const paidAmountINR = razorpayOrder.amount / 100;
-    block.totalAmount = paidAmountINR;
+    if (!block.totalAmount) {
+      block.totalAmount = paidAmountINR;
+    } else {
+      block.totalAmount = (block.totalAmount || 0) + (block.pendingAmount || 0);
+    }
+
+    block.pendingAmount = 0;
     await block.save();
 
     await reflowAllBlocks();
@@ -1141,4 +1229,5 @@ module.exports = {
   updateBlocksById,
   getTimeSeriesAnalytics,
   getSuccessfulCreatedAt,
+  updateBlockWithCoords,
 };

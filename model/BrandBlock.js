@@ -147,6 +147,10 @@ const BrandBlockSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  pendingAmount: {
+    type: Number,
+    default: 0,
+  },
   totalBlocks: {
     type: Number,
     required: true,
