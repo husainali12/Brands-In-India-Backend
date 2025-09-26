@@ -48,11 +48,14 @@ const updateUserById = async (id, updateData) => {
   });
   return user;
 };
-
+const findUserByEmail = async (email) => {
+  return await User.findOne({ email });
+};
 module.exports = {
   createUser,
   getUserByFirebaseUId,
   getUserById,
   updateUserById,
   getUsers,
+  findUserByEmail,
 };

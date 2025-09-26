@@ -19,7 +19,7 @@ const firebaseAuth =
 
         if (!user) {
           if (
-            ["/register", "/signup"].includes(req.path) ||
+            ["/register", "/signup", "/google-signin"].includes(req.path) ||
             req.path.includes("register")
           ) {
             req.newUser = payload;

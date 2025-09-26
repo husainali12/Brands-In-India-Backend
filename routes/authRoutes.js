@@ -11,6 +11,7 @@ const {
   getUsers,
   blockUser,
   unblockUser,
+  googleSignIn,
   // deleteUser,
   // verifyUser,
   // unverifyUser,
@@ -25,7 +26,7 @@ const router = express.Router();
 router.post("/token", validate(verifyToken), generateToken);
 
 router.post("/login", firebaseAuth("any"), loginUser);
-
+router.post("/google-signin", firebaseAuth("user"), googleSignIn);
 router.post(
   "/register",
   firebaseAuth("user"),

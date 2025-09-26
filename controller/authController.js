@@ -24,7 +24,45 @@ const loginUser = catchAsync(async (req, res) => {
     message: "User logged in successfully",
   });
 });
+const googleSignIn = catchAsync(async (req, res) => {
+  const { email, name, photo } = req.body; // frontend will send these
+  // const firebaseUid = req.newUser?.uid || req.user?.firebaseUid;
 
+  if (!email) {
+    return res.status(400).json({
+      status: false,
+      message: "Email is required for Google Sign-In",
+    });
+  }
+
+  // Check if user already exists
+  let user = await authService.findUserByEmail(email);
+  if (user) {
+    return res.status(200).json({
+      status: true,
+      message: "User logged in successfully with Google",
+      data: user,
+    });
+  }
+
+  // Create new user object
+  const userObj = {
+    ...createNewUserObject(req.newUser, req.defaultRole),
+    name,
+    email,
+    photo,
+  };
+
+  user = await authService.createUser(userObj);
+
+  return res.status(user ? 201 : 500).json({
+    status: !!user,
+    message: user
+      ? "User registered successfully with Google"
+      : "User registration failed",
+    data: user,
+  });
+});
 const registerUser = catchAsync(async (req, res) => {
   if (req.user) {
     return res.status(409).json({
@@ -308,6 +346,7 @@ module.exports = {
   getUsers,
   blockUser,
   unblockUser,
+  googleSignIn,
   // deleteUser,
   // verifyUser,
   // unverifyUser,
