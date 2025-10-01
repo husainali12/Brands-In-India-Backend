@@ -21,11 +21,11 @@ const BrandBlockSchema = new mongoose.Schema({
   // },
   facebookUrl: {
     type: String,
-    default: "https://www.facebook.com/",
+    // default: "https://www.facebook.com/",
   },
   instagramUrl: {
     type: String,
-    default: "https://www.instagram.com/",
+    // default: "https://www.instagram.com/",
   },
   brandEmailId: {
     type: String,
