@@ -30,6 +30,10 @@ const BrandBlockSchema = new mongoose.Schema({
   employmentId: {
     type: String,
   },
+  employee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Employee",
+  },
   brandEmailId: {
     type: String,
     // required: [true, "Please add an email"],

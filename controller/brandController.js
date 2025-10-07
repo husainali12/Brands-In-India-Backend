@@ -5,6 +5,7 @@ const config = require("../config/config");
 const crypto = require("crypto");
 const Category = require("../model/category.model");
 const mongoose = require("mongoose");
+const Emloyee = require("../model/Employee");
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
   key_secret: config.razorpay.keySecret,
@@ -227,7 +228,15 @@ const confirmAndShift = async (req, res) => {
         totalAmount,
       });
       await newBlock.save();
-
+      if (employmentId) {
+        const empId = await Emloyee.create({
+          empId: employmentId,
+          brandId: newBlock._id,
+        });
+        await BrandBlock.findByIdAndUpdate(newBlock._id, {
+          employee: empId._id,
+        });
+      }
       return res.status(200).json({
         success: true,
         data: {
