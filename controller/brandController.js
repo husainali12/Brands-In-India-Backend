@@ -141,6 +141,7 @@ const confirmAndShift = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      employmentId,
       w,
       h,
       longitude,
@@ -158,6 +159,7 @@ const confirmAndShift = async (req, res) => {
       typeof businessRegistrationNumberGstin !== "string" ||
       typeof description !== "string" ||
       typeof details !== "string" ||
+      typeof employmentId !== "string" ||
       typeof facebookUrl !== "string" ||
       typeof instagramUrl !== "string" ||
       typeof category !== "string" ||
@@ -210,6 +212,7 @@ const confirmAndShift = async (req, res) => {
         logoUrl,
         facebookUrl,
         instagramUrl,
+        employmentId,
         location: locationWithCoordinates,
         totalBlocks: w * h,
         w,

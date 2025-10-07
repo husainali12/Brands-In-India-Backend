@@ -27,6 +27,9 @@ const BrandBlockSchema = new mongoose.Schema({
     type: String,
     // default: "https://www.instagram.com/",
   },
+  employmentId: {
+    type: String,
+  },
   brandEmailId: {
     type: String,
     // required: [true, "Please add an email"],
