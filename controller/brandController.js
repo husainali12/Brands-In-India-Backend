@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const Category = require("../model/category.model");
 const mongoose = require("mongoose");
 const Emloyee = require("../model/Employee");
+const ApiError = require("../utils/ApiError");
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
   key_secret: config.razorpay.keySecret,
@@ -233,6 +234,9 @@ const confirmAndShift = async (req, res) => {
           empId: employmentId,
           brandId: newBlock._id,
         });
+        if (!newBlock) {
+          throw new ApiError("Failed to fetch brand block", 404);
+        }
         await BrandBlock.findByIdAndUpdate(newBlock._id, {
           employee: empId._id,
         });
