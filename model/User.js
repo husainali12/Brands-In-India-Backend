@@ -43,6 +43,7 @@ const UserSchema = new mongoose.Schema(
       default: false,
     },
     blockReasons: [{ type: String }],
+    isSubscriptionActive: { type: Boolean, default: false },
     // isDeleted: {
     //   type: Boolean,
     //   default: false,
