@@ -6,7 +6,7 @@ const fetch = require("node-fetch");
 const httpStatus = require("http-status");
 const ApiError = require("../utils/ApiError");
 const cloudinary = require("cloudinary").v2;
-
+const sendEmail = require("../utils/sendEmail");
 const createNewUserObject = (newUser, role = "user") => ({
   email: newUser.email,
   firebaseUid: newUser.uid,
@@ -37,6 +37,7 @@ const googleSignIn = catchAsync(async (req, res) => {
 
   // Check if user already exists
   let user = await authService.findUserByEmail(email);
+
   if (user) {
     return res.status(200).json({
       status: true,
@@ -54,7 +55,26 @@ const googleSignIn = catchAsync(async (req, res) => {
   };
 
   user = await authService.createUser(userObj);
-
+  if (user) {
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "Welcome to Our Brands in india 🎉",
+        html: `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2>Welcome, ${user.name || "User"}!</h2>
+            <p>We're thrilled to have you join us.</p>
+            <p>Your account has been successfully created. You can now view brands and explore our services.</p>
+            <br/>
+            <p>Best regards,<br><strong>The Team</strong></p>
+          </div>
+        `,
+      });
+      console.log(`✅ Welcome email sent to ${user.email}`);
+    } catch (error) {
+      console.error("❌ Failed to send welcome email:", error);
+    }
+  }
   return res.status(user ? 201 : 500).json({
     status: !!user,
     message: user
@@ -78,6 +98,26 @@ const registerUser = catchAsync(async (req, res) => {
   };
 
   const user = await authService.createUser(userObj);
+  if (user) {
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "Welcome to Our Brands in india 🎉",
+        html: `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2>Welcome, ${user.name || "User"}!</h2>
+            <p>We're thrilled to have you join us.</p>
+            <p>Your account has been successfully created. You can now view brands and explore our services.</p>
+            <br/>
+            <p>Best regards,<br><strong>The Team</strong></p>
+          </div>
+        `,
+      });
+      console.log(`✅ Welcome email sent to ${user.email}`);
+    } catch (error) {
+      console.error("❌ Failed to send welcome email:", error);
+    }
+  }
   return res.status(user ? 201 : 500).json({
     status: !!user,
     message: user ? "User registered successfully" : "User registration failed",
