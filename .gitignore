@@ -8,7 +8,7 @@ node_modules/
 # Service secrets
 firebase-service-secret.json
 *-service-secret.json
-
+package-lock.json
 # Logs
 logs
 *.log
