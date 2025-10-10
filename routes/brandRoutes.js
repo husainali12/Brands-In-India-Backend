@@ -25,7 +25,7 @@ router.post(
   firebaseAuth("user"),
   updateBlockWithCoords
 );
-router.post("/verify-purchase", verifyPurchase);
+router.post("/verify-purchase", firebaseAuth("user"), verifyPurchase);
 router.get("/blocks", getAllBlocks);
 router.post("/category", createCategory);
 router.get("/category", getCategories);

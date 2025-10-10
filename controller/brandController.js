@@ -7,6 +7,7 @@ const Category = require("../model/category.model");
 const mongoose = require("mongoose");
 const Emloyee = require("../model/Employee");
 const ApiError = require("../utils/ApiError");
+const sendEmail = require("../utils/sendEmail");
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
   key_secret: config.razorpay.keySecret,
@@ -389,7 +390,125 @@ const verifyPurchase = async (req, res) => {
 
     block.pendingAmount = 0;
     await block.save();
+    if (req.user && block.paymentStatus === "success") {
+      try {
+        await sendEmail({
+          to: req.user.email,
+          subject: `🎉 Congratulations! You have successfully purchased ${
+            block.totalBlocks
+          } tile${block.totalBlocks > 1 ? "s" : ""} for your brand "${
+            block.brandName
+          }"!`,
+          html: `
+        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+          <h2>Hi ${req.user.name || "there"},</h2>
+          <p>We’re excited to confirm your purchase of <strong>${
+            block.totalBlocks
+          }</strong> tile${
+            block.totalBlocks > 1 ? "s" : ""
+          } for your brand <strong>${block.brandName}</strong> 🎉</p>
+          
+          <p>Here’s a summary of your purchase details:</p>
+          
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <tbody>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Brand Name:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.brandName
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Contact No:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.brandContactNo || "N/A"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Email ID:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.brandEmailId || "N/A"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Business / GSTIN:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.businessRegistrationNumberGstin || "N/A"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Category:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.category || "N/A"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Description:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.description || "No description provided"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Details:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.details || "N/A"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Location:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">
+                  ${block.location?.address || "N/A"}<br/>                </td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Total Tiles Purchased:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.totalBlocks
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Total Amount Paid:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">₹${
+                  block.totalAmount || "0.00"
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Order ID:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee;">${
+                  block.orderId
+                }</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; border: 1px solid #eee;"><strong>Payment Status:</strong></td>
+                <td style="padding: 8px; border: 1px solid #eee; color: green; font-weight: bold;">${
+                  block.paymentStatus
+                }</td>
+              </tr>
+            </tbody>
+          </table>
 
+          ${
+            block.logoUrl
+              ? `<div style="margin-top: 20px;">
+                  <p><strong>Brand Logo:</strong></p>
+                  <img src="${block.logoUrl}" alt="Brand Logo" style="width: 100px; height: auto; border-radius: 8px; border: 1px solid #eee;"/>
+                </div>`
+              : ""
+          }
+
+          <br/>
+          <p>You can now manage your brand, track visibility, and view your tiles on your dashboard.</p>
+
+          <p style="margin-top: 20px;">Thank you for choosing <strong>Brands In India</strong> — we’re excited to help your brand shine!</p>
+
+          <br/>
+          <p>Best regards,<br><strong>The Brands In India Team</strong></p>
+        </div>
+      `,
+        });
+      } catch (err) {
+        console.error("Email sending failed:", err);
+      }
+    }
     await reflowAllBlocks();
 
     const finalBlock = await BrandBlock.findById(blockId).select(
