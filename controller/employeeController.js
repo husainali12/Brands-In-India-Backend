@@ -2,7 +2,7 @@ const employeeModel = require("../model/Employee");
 const catchAsync = require("../utils/catchAsync");
 
 const getAllEmployees = catchAsync(async (req, res, next) => {
-  let { page = 1, limit = 2, search = "" } = req.query;
+  let { page = 1, limit = 10, search = "" } = req.query;
   page = parseInt(page, 10);
   limit = parseInt(limit, 10);
   const query = {};
