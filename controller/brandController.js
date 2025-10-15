@@ -147,8 +147,6 @@ const confirmAndShift = async (req, res) => {
       employmentId,
       w,
       h,
-      longitude,
-      latitude,
     } = req.body;
 
     if (!req.user || !req.user._id) {
@@ -172,6 +170,8 @@ const confirmAndShift = async (req, res) => {
       typeof location.city !== "string" ||
       !location.state ||
       typeof location.state !== "string" ||
+      typeof location.latitude !== "number" ||
+      typeof location.longitude !== "number" ||
       // typeof location.address !== "string" ||
       typeof logoUrl !== "string" ||
       typeof w !== "number" ||
@@ -197,7 +197,7 @@ const confirmAndShift = async (req, res) => {
       receipt: `receipt_${Date.now()}`,
       payment_capture: 1,
     });
-
+    const { latitude, longitude } = location;
     const locationWithCoordinates = {
       ...location,
       coordinates: [longitude, latitude],
