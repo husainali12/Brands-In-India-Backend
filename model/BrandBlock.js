@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const validator = require("validator");
+const { type } = require("../firebase-service-secret");
 const BrandBlockSchema = new mongoose.Schema({
   orderNum: {
     type: Number,
@@ -142,6 +143,14 @@ const BrandBlockSchema = new mongoose.Schema({
     default: "",
   },
   paymentId: {
+    type: String,
+    default: "",
+  },
+  paymentLinkId: {
+    type: String,
+    default: "",
+  },
+  paymentLinkUrl: {
     type: String,
     default: "",
   },

@@ -1,6 +1,9 @@
 const BrandBlock = require("../model/BrandBlock");
 const cloudinary = require("cloudinary").v2;
 const Razorpay = require("razorpay");
+const {
+  validatePaymentVerification,
+} = require("razorpay/dist/utils/razorpay-utils");
 const config = require("../config/config");
 const crypto = require("crypto");
 const Category = require("../model/category.model");
@@ -266,7 +269,251 @@ const confirmAndShift = async (req, res) => {
     return res.status(500).json({ error: "Server error initiating purchase." });
   }
 };
+const sendProposal = async (req, res) => {
+  try {
+    const {
+      brandName,
+      brandContactNo,
+      brandEmailId,
+      businessRegistrationNumberGstin,
+      description,
+      details,
+      category,
+      location,
+      logoUrl,
+      facebookUrl,
+      instagramUrl,
+      employmentId,
+      w,
+      h,
+    } = req.body;
 
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+
+    // Basic validation (same as your version)
+    if (
+      typeof brandName !== "string" ||
+      typeof brandContactNo !== "string" ||
+      typeof brandEmailId !== "string" ||
+      typeof businessRegistrationNumberGstin !== "string" ||
+      typeof description !== "string" ||
+      typeof details !== "string" ||
+      typeof employmentId !== "string" ||
+      typeof facebookUrl !== "string" ||
+      typeof instagramUrl !== "string" ||
+      typeof category !== "string" ||
+      !location ||
+      typeof location !== "object" ||
+      !location.city ||
+      typeof location.city !== "string" ||
+      !location.state ||
+      typeof location.state !== "string" ||
+      typeof location.latitude !== "number" ||
+      typeof location.longitude !== "number" ||
+      typeof logoUrl !== "string" ||
+      typeof w !== "number" ||
+      typeof h !== "number"
+    ) {
+      return res.status(400).json({ error: "Invalid or missing fields." });
+    }
+
+    if (w < 1 || w > 20) {
+      return res.status(400).json({ error: "w must be between 1 and 20." });
+    }
+    if (h < 1) {
+      return res.status(400).json({ error: "h must be ≥ 1." });
+    }
+
+    const numberOfCells = w * h;
+    const unitPrice = 500;
+    const totalAmount = numberOfCells * unitPrice;
+
+    const { latitude, longitude } = location;
+    const locationWithCoordinates = {
+      ...location,
+      coordinates: [longitude, latitude],
+    };
+
+    // ✅ Step 1: Create a block first to get its _id
+    const newBlock = await BrandBlock.create({
+      brandName,
+      brandContactNo,
+      brandEmailId,
+      businessRegistrationNumberGstin,
+      description,
+      details,
+      category,
+      logoUrl,
+      facebookUrl,
+      instagramUrl,
+      employmentId,
+      location: locationWithCoordinates,
+      totalBlocks: numberOfCells,
+      w,
+      h,
+      x: 0,
+      y: 0,
+      xEnd: w,
+      yEnd: h,
+      owner: req.user._id,
+      paymentStatus: "initiated",
+      totalAmount,
+    });
+
+    // ✅ Step 2: Now create the Razorpay payment link using that _id
+    const paymentLink = await razorpay.paymentLink.create({
+      amount: totalAmount * 100,
+      currency: "INR",
+      accept_partial: false,
+      description: `Payment for ${numberOfCells} tiles for ${brandName}`,
+      customer: {
+        name: req.user.name,
+        email: req.user.email,
+        contact: brandContactNo,
+      },
+      notify: {
+        sms: true,
+        email: true,
+      },
+      reminder_enable: true,
+      callback_url: `${process.env.FRONTEND_URL}/payment-verify-link?blockId=${newBlock._id}`,
+      callback_method: "get",
+    });
+
+    // ✅ Step 3: Update block with payment link info
+    newBlock.paymentLinkId = paymentLink.id;
+    newBlock.paymentLinkUrl = paymentLink.short_url;
+    await newBlock.save();
+
+    // ✅ Step 4: Optional - create employee record
+    if (employmentId) {
+      const empId = await Emloyee.create({
+        empId: employmentId,
+        brandId: newBlock._id,
+      });
+      await BrandBlock.findByIdAndUpdate(newBlock._id, { employee: empId._id });
+    }
+
+    // ✅ Step 5: Send email with payment link
+    await sendEmail({
+      to: req.user.email,
+      subject: `Complete your payment for ${brandName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2>Hello ${req.user.name || "there"},</h2>
+          <p>You have initiated a proposal for <strong>${brandName}</strong>.</p>
+          <p>Total Tiles: <strong>${numberOfCells}</strong></p>
+          <p>Amount Payable: <strong>₹${totalAmount}</strong></p>
+          <p>To complete your payment, please click the link below:</p>
+          <a href="${paymentLink.short_url}" 
+             style="background-color:#007bff; color:white; padding:10px 20px; border-radius:6px; text-decoration:none;">
+             Pay Now
+          </a>
+          <p>This link will expire after a few hours. Please complete your payment promptly.</p>
+          <br>
+          <p>Regards,<br><strong>Brands In India Team</strong></p>
+        </div>
+      `,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Proposal created. Payment link sent to your email.",
+      data: {
+        blockId: newBlock._id,
+        paymentLink: paymentLink.short_url,
+      },
+    });
+  } catch (err) {
+    console.error("Error in sendProposal:", err);
+    return res.status(500).json({
+      error: "Server error initiating payment.",
+      details: err.message,
+    });
+  }
+};
+const verifyPaymentLink = async (req, res) => {
+  try {
+    const {
+      blockId,
+      razorpay_payment_id,
+      razorpay_payment_link_id,
+      razorpay_payment_link_status,
+      razorpay_signature,
+      razorpay_payment_link_reference_id = "", // default to empty string
+    } = req.body;
+
+    // Check authentication
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+
+    // Validate required fields
+    if (
+      !blockId ||
+      !razorpay_payment_id ||
+      !razorpay_payment_link_id ||
+      !razorpay_signature
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Missing required payment details." });
+    }
+
+    // Fetch block from DB
+    const block = await BrandBlock.findById(blockId);
+    if (!block) return res.status(404).json({ error: "Block not found." });
+
+    // If payment already verified
+    if (
+      block.razorpayPaymentId === razorpay_payment_id &&
+      block.paymentStatus === "success"
+    ) {
+      return res.status(200).json({
+        success: true,
+        message: "Payment already verified.",
+        data: { blockId: block._id, paymentStatus: block.paymentStatus },
+      });
+    }
+
+    // Validate signature using Razorpay helper
+    const isValid = validatePaymentVerification(
+      {
+        payment_link_id: razorpay_payment_link_id,
+        payment_id: razorpay_payment_id,
+        payment_link_reference_id: razorpay_payment_link_reference_id,
+        payment_link_status: razorpay_payment_link_status,
+      },
+      razorpay_signature,
+      config.razorpay.keySecret
+    );
+
+    if (!isValid) {
+      return res.status(400).json({ error: "Invalid payment signature." });
+    }
+
+    if (razorpay_payment_link_status !== "paid") {
+      return res.status(400).json({ error: "Payment not completed yet." });
+    }
+
+    // Update block with payment info
+    block.paymentStatus = "success";
+    block.paymentId = razorpay_payment_id;
+    block.paymentLinkId = razorpay_payment_link_id;
+    await block.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment verified successfully.",
+      data: { blockId: block._id, paymentStatus: block.paymentStatus },
+    });
+  } catch (err) {
+    console.error("Error verifying payment:", err);
+    return res.status(500).json({ error: "Server error verifying payment." });
+  }
+};
 const updateBlockWithCoords = async (req, res) => {
   try {
     const { blockId } = req.params;
@@ -1365,4 +1612,6 @@ module.exports = {
   getTimeSeriesAnalytics,
   getSuccessfulCreatedAt,
   updateBlockWithCoords,
+  sendProposal,
+  verifyPaymentLink,
 };
