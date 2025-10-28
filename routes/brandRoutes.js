@@ -16,6 +16,8 @@ const {
   updateBlockWithCoords,
   sendProposal,
   verifyPaymentLink,
+  createSubscription,
+  verifySubscriptionPayment,
 } = require("../controller/brandController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
@@ -30,6 +32,8 @@ router.post(
   updateBlockWithCoords
 );
 router.post("/verify-purchase", firebaseAuth("user"), verifyPurchase);
+router.post("/create-subscription", firebaseAuth("user"), createSubscription);
+router.post("/verify-subscription-payment/:id", verifySubscriptionPayment);
 router.get("/blocks", getAllBlocks);
 router.post("/category", createCategory);
 router.get("/category", getCategories);

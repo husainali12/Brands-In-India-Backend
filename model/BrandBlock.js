@@ -167,6 +167,44 @@ const BrandBlockSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  subscriptionId: {
+    type: String,
+    default: "",
+    index: true, // helps query by subscription quickly
+  },
+  planId: {
+    type: String,
+    default: "",
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ["created", "active", "completed", "paused", "cancelled"],
+    // default: "created",
+  },
+  startAt: {
+    type: Date,
+  },
+  endAt: {
+    type: Date,
+  },
+  chargeAt: {
+    type: Date,
+  },
+  nextPaymentDate: {
+    type: Date,
+  },
+  initialAmount: {
+    type: Number,
+    default: 600, // ₹600 initial fee
+  },
+  recurringAmount: {
+    type: Number,
+    default: 50, // ₹50 monthly recurring
+  },
+  totalBillingCycles: {
+    type: Number,
+    default: 12, // e.g., for a 1-year subscription
+  },
   totalBlocks: {
     type: Number,
     required: true,

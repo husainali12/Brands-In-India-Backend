@@ -1,5 +1,6 @@
 const BrandBlock = require("../model/BrandBlock");
 const cloudinary = require("cloudinary").v2;
+const User = require("../model/User");
 const Razorpay = require("razorpay");
 const {
   validatePaymentVerification,
@@ -514,6 +515,151 @@ const verifyPaymentLink = async (req, res) => {
     return res.status(500).json({ error: "Server error verifying payment." });
   }
 };
+const verifySubscriptionPayment = async (req, res) => {
+  try {
+    const {
+      razorpay_payment_id,
+      razorpay_subscription_id,
+      razorpay_signature,
+    } = req.body;
+
+    if (
+      !razorpay_payment_id ||
+      !razorpay_subscription_id ||
+      !razorpay_signature
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing payment data." });
+    }
+
+    // 1️⃣ Generate expected signature using HMAC SHA256
+    const generated_signature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
+      .digest("hex");
+
+    // 2️⃣ Compare signatures
+    if (generated_signature !== razorpay_signature) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid signature." });
+    }
+
+    // 3️⃣ Update DB payment status (optional)
+    const block = await BrandBlock.findOne({
+      subscriptionId: razorpay_subscription_id,
+    });
+    await User.findOneAndUpdate(
+      { firebaseUid: req.params.id },
+      { isSubscriptionActive: true }
+    );
+    if (block) {
+      block.paymentStatus = "success";
+      block.paymentId = razorpay_payment_id;
+      await block.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Payment verified successfully.",
+    });
+  } catch (error) {
+    console.error("Payment verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while verifying payment.",
+      error: error.message,
+    });
+  }
+};
+const createSubscription = async (req, res) => {
+  try {
+    const { blockId } = req.body;
+
+    // 1️⃣ Authentication check
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+
+    // 2️⃣ Input validation
+    if (!blockId) {
+      return res.status(400).json({ error: "Missing blockId." });
+    }
+
+    // 3️⃣ Fetch brand block
+    const block = await BrandBlock.findById(blockId);
+    if (!block) {
+      return res.status(404).json({ error: "Brand block not found." });
+    }
+
+    // 4️⃣ Calculate plan & setup fee
+    const monthlyAmount = block.totalBlocks * 50 * 100; // ₹50 per block (paise)
+    const setupFee = block.totalBlocks * 600 * 100; // ₹600 per block (paise)
+
+    // 5️⃣ Create plan
+    const plan = await razorpay.plans.create({
+      period: "monthly",
+      interval: 1,
+      item: {
+        name: "Brand Subscription Plan",
+        amount: monthlyAmount,
+        currency: "INR",
+      },
+    });
+
+    // 6️⃣ Create subscription
+    const startTime = Math.floor(Date.now() / 1000) + 5 * 60; // 5 min buffer
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: plan.id,
+      customer_notify: 1,
+      total_count: 12, // 12 months
+      start_at: startTime,
+      addons: [
+        {
+          item: {
+            name: "Initial Setup Charge",
+            amount: setupFee,
+            currency: "INR",
+          },
+        },
+      ],
+      notes: {
+        brandBlockId: blockId,
+        userId: req.user._id.toString(),
+      },
+    });
+
+    console.log("Razorpay Subscription:", subscription);
+
+    // 7️⃣ Save subscription details using charge_at, start_at, end_at
+    block.planId = plan.id;
+    block.subscriptionId = subscription.id;
+    block.subscriptionStatus = subscription.status;
+    block.initialAmount = setupFee / 100;
+    block.recurringAmount = monthlyAmount / 100;
+    block.startAt = new Date(subscription.start_at * 1000);
+    block.chargeAt = new Date(subscription.charge_at * 1000);
+    block.endAt = new Date(subscription.end_at * 1000);
+    block.nextPaymentDate = new Date(subscription.charge_at * 1000);
+
+    await block.save();
+
+    // 8️⃣ Return response
+    res.status(201).json({
+      success: true,
+      message: "Subscription created successfully.",
+      subscription,
+    });
+  } catch (error) {
+    console.error("Error creating subscription:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while creating subscription.",
+      error: error.message,
+    });
+  }
+};
 const updateBlockWithCoords = async (req, res) => {
   try {
     const { blockId } = req.params;
@@ -759,7 +905,7 @@ const verifyPurchase = async (req, res) => {
     await reflowAllBlocks();
 
     const finalBlock = await BrandBlock.findById(blockId).select(
-      "_id orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details location logoUrl x y w h"
+      "_id orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details location logoUrl x y w h initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
     );
 
     return res.status(200).json({
@@ -834,7 +980,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
       )
       .populate("owner", "name email isBlocked");
 
@@ -904,7 +1050,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails"
+        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
       )
       .populate({
         path: "clickDetails.userId",
@@ -1614,4 +1760,6 @@ module.exports = {
   updateBlockWithCoords,
   sendProposal,
   verifyPaymentLink,
+  createSubscription,
+  verifySubscriptionPayment,
 };
