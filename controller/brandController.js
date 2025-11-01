@@ -573,79 +573,311 @@ const verifySubscriptionPayment = async (req, res) => {
     });
   }
 };
+// const createSubscription = async (req, res) => {
+//   try {
+//     const { blockId } = req.body;
+
+//     // 1️⃣ Authentication check
+//     if (!req.user || !req.user._id) {
+//       return res.status(401).json({ error: "Authentication required." });
+//     }
+
+//     // 2️⃣ Input validation
+//     if (!blockId) {
+//       return res.status(400).json({ error: "Missing blockId." });
+//     }
+
+//     // 3️⃣ Fetch brand block
+//     const block = await BrandBlock.findById(blockId);
+//     if (!block) {
+//       return res.status(404).json({ error: "Brand block not found." });
+//     }
+
+//     // 4️⃣ Calculate plan & setup fee
+//     const monthlyAmount = block.totalBlocks * 50 * 100; // ₹50 per block (paise)
+//     const setupFee = block.totalBlocks * 600 * 100; // ₹600 per block (paise)
+
+//     // 5️⃣ Create plan
+//     const plan = await razorpay.plans.create({
+//       period: "monthly",
+//       interval: 1,
+//       item: {
+//         name: "Brand Subscription Plan",
+//         amount: monthlyAmount,
+//         currency: "INR",
+//       },
+//     });
+
+//     // 6️⃣ Create subscription
+//     const startTime = Math.floor(Date.now() / 1000) + 5 * 60; // 5 min buffer
+//     const subscription = await razorpay.subscriptions.create({
+//       plan_id: plan.id,
+//       customer_notify: 1,
+//       total_count: 12, // 12 months
+//       start_at: startTime,
+//       addons: [
+//         {
+//           item: {
+//             name: "Initial Setup Charge",
+//             amount: setupFee,
+//             currency: "INR",
+//           },
+//         },
+//       ],
+//       notes: {
+//         brandBlockId: blockId,
+//         userId: req.user._id.toString(),
+//       },
+//     });
+
+//     console.log("Razorpay Subscription:", subscription);
+
+//     // 7️⃣ Save subscription details using charge_at, start_at, end_at
+//     block.planId = plan.id;
+//     block.subscriptionId = subscription.id;
+//     block.subscriptionStatus = subscription.status;
+//     block.initialAmount = setupFee / 100;
+//     block.recurringAmount = monthlyAmount / 100;
+//     block.startAt = new Date(subscription.start_at * 1000);
+//     block.chargeAt = new Date(subscription.charge_at * 1000);
+//     block.endAt = new Date(subscription.end_at * 1000);
+//     block.nextPaymentDate = new Date(subscription.charge_at * 1000);
+
+//     await block.save();
+
+//     // 8️⃣ Return response
+//     res.status(201).json({
+//       success: true,
+//       message: "Subscription created successfully.",
+//       subscription,
+//     });
+//   } catch (error) {
+//     console.error("Error creating subscription:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error while creating subscription.",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// const createSubscription = async (req, res) => {
+//   try {
+//     const { blockId, planType = "monthly", duration = 1 } = req.body;
+
+//     if (!req.user || !req.user._id) {
+//       return res.status(401).json({ error: "Authentication required." });
+//     }
+
+//     if (!blockId) {
+//       return res.status(400).json({ error: "Missing blockId." });
+//     }
+
+//     const block = await BrandBlock.findById(blockId);
+//     if (!block) {
+//       return res.status(404).json({ error: "Brand block not found." });
+//     }
+
+//     // 💰 Base Calculations
+//     const totalTiles = block.totalBlocks;
+//     const setupFee = totalTiles * 600 * 100; // ₹600/tile
+//     const monthlyAmount = totalTiles * 60 * 100; // ₹60/tile/month
+//     const yearlyAmount = totalTiles * 60 * 12 * 100; // ₹720/tile/year
+
+//     let recurringAmount = monthlyAmount;
+//     let totalCount = 12; // default 1 year
+//     let interval = 1;
+
+//     if (planType === "yearly") {
+//       recurringAmount = yearlyAmount; // per year
+//       totalCount = duration * 12;
+//       interval = duration;
+//     }
+
+//     // 🪙 1️⃣ Create the recurring plan (for auto deductions)
+//     const plan = await razorpay.plans.create({
+//       period: "monthly", // Razorpay supports only weekly/monthly
+//       interval: 1,
+//       item: {
+//         name: `${block.brandName} Subscription`,
+//         amount: monthlyAmount, // base monthly recurring
+//         currency: "INR",
+//       },
+//     });
+
+//     let orderAmount = setupFee; // default for monthly
+
+//     // 🧾 2️⃣ Calculate initial payment amount
+//     if (planType === "yearly") {
+//       // initial setup + all yearly charges upfront
+//       const totalYearly = yearlyAmount * duration;
+//       orderAmount = setupFee + totalYearly;
+//     }
+
+//     // 🪙 3️⃣ Create Razorpay order for first payment
+//     const order = await razorpay.orders.create({
+//       amount: orderAmount,
+//       currency: "INR",
+//       receipt: `setup_${block._id}_${Date.now()}`,
+//       notes: {
+//         blockId,
+//         planType,
+//         purpose:
+//           planType === "yearly"
+//             ? "Initial + Yearly Fee"
+//             : "Initial Setup Fee Only",
+//       },
+//     });
+
+//     // 📅 4️⃣ Set start time for subscription (after 1 month if monthly)
+//     let startTime = Math.floor(Date.now() / 1000) + 5 * 60; // default: start in 5 mins
+//     if (planType === "monthly") {
+//       const nextMonth = new Date();
+//       nextMonth.setMonth(nextMonth.getMonth() + 1);
+//       startTime = Math.floor(nextMonth.getTime() / 1000);
+//     }
+
+//     // 🔁 5️⃣ Create subscription (for next cycles)
+//     const subscription = await razorpay.subscriptions.create({
+//       plan_id: plan.id,
+//       total_count: totalCount,
+//       start_at: startTime,
+//       customer_notify: 1,
+//       notes: {
+//         brandBlockId: blockId,
+//         userId: req.user._id.toString(),
+//         planType,
+//         duration,
+//       },
+//     });
+
+//     // 💾 6️⃣ Save in DB
+//     block.planId = plan.id;
+//     block.subscriptionId = subscription.id;
+//     block.subscriptionStatus = subscription.status;
+//     block.initialAmount = setupFee / 100;
+//     block.recurringAmount = monthlyAmount / 100;
+//     block.totalBillingCycles = totalCount;
+//     block.startAt = new Date(subscription.start_at * 1000);
+//     block.endAt = subscription.end_at
+//       ? new Date(subscription.end_at * 1000)
+//       : null;
+//     block.nextPaymentDate =
+//       planType === "monthly" ? new Date(block.startAt) : null;
+//     await block.save();
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Subscription created successfully.",
+//       data: {
+//         order,
+//         subscription,
+//         paymentType:
+//           planType === "yearly"
+//             ? "Initial + Yearly in First Payment"
+//             : "Initial Only in First Payment",
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error creating subscription:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error while creating subscription.",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const createSubscription = async (req, res) => {
   try {
-    const { blockId } = req.body;
+    const { blockId, planType = "monthly", duration = 1 } = req.body;
 
-    // 1️⃣ Authentication check
-    if (!req.user || !req.user._id) {
+    if (!req.user || !req.user._id)
       return res.status(401).json({ error: "Authentication required." });
-    }
+    if (!blockId) return res.status(400).json({ error: "Missing blockId." });
 
-    // 2️⃣ Input validation
-    if (!blockId) {
-      return res.status(400).json({ error: "Missing blockId." });
-    }
-
-    // 3️⃣ Fetch brand block
     const block = await BrandBlock.findById(blockId);
-    if (!block) {
+    if (!block)
       return res.status(404).json({ error: "Brand block not found." });
+
+    // Base prices per tile
+    const setupFee = block.totalBlocks * 600 * 100; // ₹600 per tile (one time)
+    const monthlyAmount = block.totalBlocks * 60 * 100; // ₹60 per tile per month
+
+    let planAmount = monthlyAmount;
+    let totalCount = 12;
+    let interval = 1;
+
+    if (planType === "yearly") {
+      planAmount = block.totalBlocks * 60 * 12 * 100; // ₹60×12 per tile (1 year)
+      totalCount = duration; // Razorpay treats each as one billing cycle per year
+      interval = 12; // 12 months interval between yearly payments
     }
 
-    // 4️⃣ Calculate plan & setup fee
-    const monthlyAmount = block.totalBlocks * 50 * 100; // ₹50 per block (paise)
-    const setupFee = block.totalBlocks * 600 * 100; // ₹600 per block (paise)
-
-    // 5️⃣ Create plan
+    // Create Razorpay plan
     const plan = await razorpay.plans.create({
       period: "monthly",
-      interval: 1,
+      interval: planType === "yearly" ? 12 : 1,
       item: {
-        name: "Brand Subscription Plan",
-        amount: monthlyAmount,
+        name: `${block.brandName} ${planType} plan`,
+        amount: planAmount,
         currency: "INR",
       },
     });
 
-    // 6️⃣ Create subscription
-    const startTime = Math.floor(Date.now() / 1000) + 5 * 60; // 5 min buffer
+    // Start in 5 minutes to allow checkout flow
+    const startTime = Math.floor(Date.now() / 1000) + 5 * 60;
+
+    // Addon logic:
+    // Monthly → only initial setupFee
+    // Yearly → setupFee + first year's recurring included at once
+    const addons = [
+      {
+        item: {
+          name: "Initial Setup Fee",
+          amount: setupFee,
+          currency: "INR",
+        },
+      },
+    ];
+    if (planType === "yearly") {
+      addons.push({
+        item: {
+          name: `First Year Payment (${duration} Year${
+            duration > 1 ? "s" : ""
+          })`,
+          amount: planAmount * duration, // full yearly amount up front
+          currency: "INR",
+        },
+      });
+    }
+
     const subscription = await razorpay.subscriptions.create({
       plan_id: plan.id,
+      total_count: totalCount,
       customer_notify: 1,
-      total_count: 12, // 12 months
       start_at: startTime,
-      addons: [
-        {
-          item: {
-            name: "Initial Setup Charge",
-            amount: setupFee,
-            currency: "INR",
-          },
-        },
-      ],
+      addons,
       notes: {
         brandBlockId: blockId,
         userId: req.user._id.toString(),
+        planType,
+        duration,
       },
     });
 
-    console.log("Razorpay Subscription:", subscription);
-
-    // 7️⃣ Save subscription details using charge_at, start_at, end_at
+    // Save metadata
     block.planId = plan.id;
     block.subscriptionId = subscription.id;
     block.subscriptionStatus = subscription.status;
     block.initialAmount = setupFee / 100;
-    block.recurringAmount = monthlyAmount / 100;
+    block.recurringAmount = planAmount / 100;
+    block.totalBillingCycles = totalCount;
     block.startAt = new Date(subscription.start_at * 1000);
     block.chargeAt = new Date(subscription.charge_at * 1000);
     block.endAt = new Date(subscription.end_at * 1000);
-    block.nextPaymentDate = new Date(subscription.charge_at * 1000);
-
     await block.save();
 
-    // 8️⃣ Return response
     res.status(201).json({
       success: true,
       message: "Subscription created successfully.",
@@ -1096,7 +1328,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus totalBillingCycles chargeAt startAt endAt"
       )
       .populate({
         path: "clickDetails.userId",
