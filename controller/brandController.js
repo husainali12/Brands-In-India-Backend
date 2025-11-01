@@ -924,6 +924,9 @@ const getAllBlocks = async (req, res) => {
       city,
       state,
       country,
+      lat,
+      lng,
+      radius = 10,
       category,
       search,
       paymentStatus = "success",
@@ -932,10 +935,22 @@ const getAllBlocks = async (req, res) => {
       page = 1,
       limit = 100,
     } = req.query;
-
+    console.log(lat, lng);
     const filter = {};
 
-    if (city) {
+    const earthRadiusInKm = 6378.1;
+
+    // 🔥 Apply 500 km radius filter if lat/lng are present
+    if (lat && lng) {
+      const radiusInKm = 500;
+      const radiusInRadians = radiusInKm / earthRadiusInKm;
+
+      filter.location = {
+        $geoWithin: {
+          $centerSphere: [[parseFloat(lng), parseFloat(lat)], radiusInRadians],
+        },
+      };
+    } else if (city) {
       filter["location.city"] = new RegExp(city, "i");
     }
     if (state) {
