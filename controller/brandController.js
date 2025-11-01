@@ -926,7 +926,6 @@ const getAllBlocks = async (req, res) => {
       country,
       lat,
       lng,
-      radius = 10,
       category,
       search,
       paymentStatus = "success",
@@ -938,17 +937,49 @@ const getAllBlocks = async (req, res) => {
     console.log(lat, lng);
     const filter = {};
 
-    const earthRadiusInKm = 6378.1;
+    // const earthRadiusInKm = 6378.1;
 
     // 🔥 Apply 500 km radius filter if lat/lng are present
     if (lat && lng) {
+      const userLat = parseFloat(lat);
+      const userLng = parseFloat(lng);
       const radiusInKm = 500;
-      const radiusInRadians = radiusInKm / earthRadiusInKm;
 
-      filter.location = {
-        $geoWithin: {
-          $centerSphere: [[parseFloat(lng), parseFloat(lat)], radiusInRadians],
-        },
+      filter.$expr = {
+        $lte: [
+          {
+            $multiply: [
+              6371,
+              {
+                $acos: {
+                  $add: [
+                    {
+                      $multiply: [
+                        { $sin: { $degreesToRadians: "$location.lat" } },
+                        Math.sin((Math.PI / 180) * userLat),
+                      ],
+                    },
+                    {
+                      $multiply: [
+                        { $cos: { $degreesToRadians: "$location.lat" } },
+                        Math.cos((Math.PI / 180) * userLat),
+                        {
+                          $cos: {
+                            $subtract: [
+                              { $degreesToRadians: "$location.lng" },
+                              (Math.PI / 180) * userLng,
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          radiusInKm,
+        ],
       };
     } else if (city) {
       filter["location.city"] = new RegExp(city, "i");
@@ -998,7 +1029,7 @@ const getAllBlocks = async (req, res) => {
         "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
       )
       .populate("owner", "name email isBlocked");
-
+    console.log(blocks);
     return res.json({
       success: true,
       message: "Blocks fetched successfully",
