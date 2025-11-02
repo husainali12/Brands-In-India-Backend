@@ -192,8 +192,12 @@ const confirmAndShift = async (req, res) => {
     }
 
     const numberOfCells = w * h;
-    const unitPrice = 500;
-    const totalAmount = numberOfCells * unitPrice;
+    const baseUnitPrice = 600;
+    // const gstRate = 0.18;
+    // const unitPriceWithGST = baseUnitPrice + baseUnitPrice * gstRate;
+    const totalAmount1 = numberOfCells * baseUnitPrice;
+    const totalAmountWithGst = totalAmount1 * 0.18;
+    const totalAmount = totalAmount1 + totalAmountWithGst;
 
     const razorpayOrder = await razorpay.orders.create({
       amount: totalAmount * 100,
@@ -327,9 +331,13 @@ const sendProposal = async (req, res) => {
       return res.status(400).json({ error: "h must be ≥ 1." });
     }
 
-    const numberOfCells = w * h;
-    const unitPrice = 500;
-    const totalAmount = numberOfCells * unitPrice;
+    // const numberOfCells = w * h;
+    // const unitPrice = 500;
+    // const totalAmount = numberOfCells * unitPrice;
+    const baseUnitPrice = 600;
+    const gstRate = 0.18;
+    const unitPriceWithGST = baseUnitPrice + baseUnitPrice * gstRate;
+    const totalAmount = numberOfCells * unitPriceWithGST;
 
     const { latitude, longitude } = location;
     const locationWithCoordinates = {
@@ -801,15 +809,19 @@ const createSubscription = async (req, res) => {
       return res.status(404).json({ error: "Brand block not found." });
 
     // Base prices per tile
-    const setupFee = block.totalBlocks * 600 * 100; // ₹600 per tile (one time)
-    const monthlyAmount = block.totalBlocks * 60 * 100; // ₹60 per tile per month
+    // const setupFee = block.totalBlocks * 600 * 100;
+    const basePricePerTile = 60; // base ₹60
+    const gstRate = 0.18;
+    const priceWithGST = basePricePerTile + basePricePerTile * gstRate; // ₹60 + 18% = ₹70.8
+    const priceWithGSTInPaise = Math.round(priceWithGST * 100); // ₹600 per tile (one time)
+    const monthlyAmount = block.totalBlocks * priceWithGSTInPaise; // ₹60 per tile per month
 
     let planAmount = monthlyAmount;
     let totalCount = 12;
     let interval = 1;
 
     if (planType === "yearly") {
-      planAmount = block.totalBlocks * 60 * 12 * 100; // ₹60×12 per tile (1 year)
+      planAmount = block.totalBlocks * priceWithGSTInPaise * 12; // ₹60×12 per tile (1 year)
       totalCount = duration; // Razorpay treats each as one billing cycle per year
       interval = 12; // 12 months interval between yearly payments
     }
@@ -826,38 +838,38 @@ const createSubscription = async (req, res) => {
     });
 
     // Start in 5 minutes to allow checkout flow
-    const startTime = Math.floor(Date.now() / 1000) + 5 * 60;
+    // const startTime = Math.floor(Date.now() / 1000) + 5 * 60;
 
     // Addon logic:
     // Monthly → only initial setupFee
     // Yearly → setupFee + first year's recurring included at once
-    const addons = [
-      {
-        item: {
-          name: "Initial Setup Fee",
-          amount: setupFee,
-          currency: "INR",
-        },
-      },
-    ];
-    if (planType === "yearly") {
-      addons.push({
-        item: {
-          name: `First Year Payment (${duration} Year${
-            duration > 1 ? "s" : ""
-          })`,
-          amount: planAmount * duration, // full yearly amount up front
-          currency: "INR",
-        },
-      });
-    }
+    // const addons = [
+    //   {
+    //     item: {
+    //       name: "Initial Setup Fee",
+    //       amount: setupFee,
+    //       currency: "INR",
+    //     },
+    //   },
+    // ];
+    // if (planType === "yearly") {
+    //   addons.push({
+    //     item: {
+    //       name: `First Year Payment (${duration} Year${
+    //         duration > 1 ? "s" : ""
+    //       })`,
+    //       amount: planAmount * duration, // full yearly amount up front
+    //       currency: "INR",
+    //     },
+    //   });
+    // }
 
     const subscription = await razorpay.subscriptions.create({
       plan_id: plan.id,
       total_count: totalCount,
       customer_notify: 1,
-      start_at: startTime,
-      addons,
+      // start_at: startTime,
+      // addons,
       notes: {
         brandBlockId: blockId,
         userId: req.user._id.toString(),
@@ -870,7 +882,7 @@ const createSubscription = async (req, res) => {
     block.planId = plan.id;
     block.subscriptionId = subscription.id;
     block.subscriptionStatus = subscription.status;
-    block.initialAmount = setupFee / 100;
+    // block.initialAmount = setupFee / 100;
     block.recurringAmount = planAmount / 100;
     block.totalBillingCycles = totalCount;
     block.startAt = new Date(subscription.start_at * 1000);
