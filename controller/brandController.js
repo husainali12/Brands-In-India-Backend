@@ -911,7 +911,9 @@ const updateBlockWithCoords = async (req, res) => {
   try {
     const { blockId } = req.params;
     const { logoUrl, x, y, w, h } = req.body;
-    const unitPrice = 500;
+    const baseUnitPrice = 600;
+    const gstRate = 0.18;
+    const unitPrice = baseUnitPrice + baseUnitPrice * gstRate;
     const block = await BrandBlock.findById(blockId);
     if (!block) {
       return res
