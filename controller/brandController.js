@@ -877,7 +877,7 @@ const createSubscription = async (req, res) => {
         duration,
       },
     });
-    console.log(subscription.notes);
+    // console.log(subscription.notes);
     // Save metadata
     block.planId = plan.id;
     block.subscriptionId = subscription.id;
@@ -938,8 +938,8 @@ const updateBlockWithCoords = async (req, res) => {
     }
     let extraBlocks = 0;
     let extraPrice = 0;
-    console.log("Old block count:", oldBlockCount);
-    console.log("New block count:", newBlockCount);
+    // console.log("Old block count:", oldBlockCount);
+    // console.log("New block count:", newBlockCount);
     let razorpayOrder = null;
     if (newBlockCount > oldBlockCount) {
       extraBlocks = newBlockCount - oldBlockCount;
@@ -950,7 +950,7 @@ const updateBlockWithCoords = async (req, res) => {
         receipt: `update_receipt_${Date.now()}`,
         payment_capture: 1,
       });
-      console.log("Created razorpay order:", razorpayOrder);
+      // console.log("Created razorpay order:", razorpayOrder);
       block.orderId = razorpayOrder.id;
       block.paymentStatus = "initiated";
       // block.totalAmount = (block.totalAmount || 0) + extraPrice;
@@ -1276,7 +1276,7 @@ const getAllBlocks = async (req, res) => {
         "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
       )
       .populate("owner", "name email isBlocked");
-    console.log(blocks);
+    // console.log(blocks);
     return res.json({
       success: true,
       message: "Blocks fetched successfully",
@@ -1532,54 +1532,37 @@ const recordBrandBlockClick = async (req, res) => {
     block.clicks += 1;
 
     // Check if user has already clicked today on this block
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
+    // const today = new Date();
+    // today.setHours(0, 0, 0, 0); // Start of today
 
-    const existingClickToday = block.clickDetails.find((click) => {
-      const clickDate = new Date(click.clickedAt);
-      clickDate.setHours(0, 0, 0, 0); // Start of click day
-      return (
-        click.userId.toString() === req.user._id.toString() &&
-        clickDate.getTime() === today.getTime()
-      );
-    });
-
+    // const existingClickToday = block.clickDetails.find((click) => {
+    //   const clickDate = new Date(click.clickedAt);
+    //   clickDate.setHours(0, 0, 0, 0); // Start of click day
+    //   return (
+    //     click.userId.toString() === req.user._id.toString() &&
+    //     clickDate.getTime() === today.getTime()
+    //   );
+    // });
+    const existingClick = block.clickDetails.find(
+      (click) => click.userId.toString() === req.user._id.toString()
+    );
     // Only add click details if user hasn't clicked today
-    if (!existingClickToday) {
+    if (!existingClick) {
       // Get user information from the authenticated user (MongoDB User object)
       const userInfo = {
-        userId: req.user._id, // MongoDB ObjectId
-        // userEmail: req.user.email,
-        // userName: req.user.name || req.user.displayName || null,
-        // userPhoto: req.user.photoURL || null,
+        userId: req.user._id,
         clickedAt: new Date(),
-        // userAgent: req.headers["user-agent"] || null,
-        // ipAddress: req.ip || req.connection.remoteAddress || null,
       };
 
-      // Add click details to the array (only once per day)
+      // Add click details to the array (only once)
       block.clickDetails.push(userInfo);
-    }
-
-    await block.save();
-
-    // Return redirect URL if available
-    if (block.clickUrl) {
-      return res.status(200).json({
-        success: true,
-        redirectUrl: block.clickUrl,
-        message: existingClickToday
-          ? "Click counted (already recorded today)"
-          : "Click recorded",
-      });
-    }
-    // sendGrid function to send click info
-    const user = await User.findById(block.owner._id);
-    console.log(user);
-    await sendEmail({
-      to: user.email,
-      subject: `You’ve Got a New Lead! Take Action Now`,
-      html: `
+      // sendGrid function to send click info
+      const user = await User.findById(block.owner._id);
+      // console.log(user);
+      await sendEmail({
+        to: user.email,
+        subject: `You’ve Got a New Lead! Take Action Now`,
+        html: `
         <div style="font-family: Arial, sans-serif; color: #333;">
           <h2>Hi ${user.name},</h2>
           <p>Great news — your marketing efforts are paying off! 🎉
@@ -1591,10 +1574,25 @@ A new lead has just been generated through your account on <strong>BRANDS IN IND
           <p>Regards,<br><strong>Brands In India Team</strong></p>
         </div>
       `,
-    });
+      });
+    }
+
+    await block.save();
+
+    // Return redirect URL if available
+    if (block.clickUrl) {
+      return res.status(200).json({
+        success: true,
+        redirectUrl: block.clickUrl,
+        message: existingClick
+          ? "Click counted (already recorded today)"
+          : "Click recorded",
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      message: existingClickToday
+      message: existingClick
         ? "Click counted (already recorded today)"
         : "Click recorded",
     });
