@@ -877,17 +877,20 @@ const createSubscription = async (req, res) => {
         duration,
       },
     });
-
+    console.log(subscription.notes);
     // Save metadata
     block.planId = plan.id;
     block.subscriptionId = subscription.id;
     block.subscriptionStatus = subscription.status;
+    block.subsscriptionPlantType = subscription.notes.planType;
     // block.initialAmount = setupFee / 100;
     block.recurringAmount = planAmount / 100;
     block.totalBillingCycles = totalCount;
-    block.startAt = new Date(subscription.start_at * 1000);
-    block.chargeAt = new Date(subscription.charge_at * 1000);
-    block.endAt = new Date(subscription.end_at * 1000);
+    if (subscription.start_at)
+      block.startAt = new Date(subscription.start_at * 1000);
+    if (subscription.charge_at)
+      block.chargeAt = new Date(subscription.charge_at * 1000);
+    if (subscription.end_at) block.endAt = new Date(subscription.end_at * 1000);
     await block.save();
 
     res.status(201).json({
@@ -1340,7 +1343,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus totalBillingCycles chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
       )
       .populate({
         path: "clickDetails.userId",

@@ -181,6 +181,9 @@ const BrandBlockSchema = new mongoose.Schema({
     enum: ["created", "active", "completed", "paused", "cancelled"],
     // default: "created",
   },
+  subsscriptionPlantType: {
+    type: String,
+  },
   startAt: {
     type: Date,
   },
