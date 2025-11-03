@@ -331,7 +331,7 @@ const sendProposal = async (req, res) => {
       return res.status(400).json({ error: "h must be ≥ 1." });
     }
 
-    // const numberOfCells = w * h;
+    const numberOfCells = w * h;
     // const unitPrice = 500;
     // const totalAmount = numberOfCells * unitPrice;
     const baseUnitPrice = 600;
