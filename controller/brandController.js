@@ -903,7 +903,7 @@ const createSubscription = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while creating subscription.",
-      error: error.message,
+      error: error,
     });
   }
 };
