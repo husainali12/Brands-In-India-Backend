@@ -1573,7 +1573,25 @@ const recordBrandBlockClick = async (req, res) => {
           : "Click recorded",
       });
     }
-
+    // sendGrid function to send click info
+    const user = await User.findById(block.owner._id);
+    console.log(user);
+    await sendEmail({
+      to: user.email,
+      subject: `You’ve Got a New Lead! Take Action Now`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2>Hi ${user.name},</h2>
+          <p>Great news — your marketing efforts are paying off! 🎉
+A new lead has just been generated through your account on <strong>BRANDS IN INDIA</strong>.</p>
+          <p>Lead Summary:</p>
+          <p>Name: <strong>${req.user.name}</strong></p>
+          <p>Email:<strong>${req.user.email}</strong></p>
+          <p>Phone:<strong>${req.user.phone || "Not provided"}</strong></p>
+          <p>Regards,<br><strong>Brands In India Team</strong></p>
+        </div>
+      `,
+    });
     return res.status(200).json({
       success: true,
       message: existingClickToday
