@@ -151,35 +151,23 @@ const confirmAndShift = async (req, res) => {
       employmentId,
       w,
       h,
+      planType = "monthly",
+      duration = 1,
     } = req.body;
 
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: "Authentication required." });
     }
-
+    console.log(planType, duration);
     if (
       typeof brandName !== "string" ||
       typeof brandContactNo !== "string" ||
       typeof brandEmailId !== "string" ||
-      typeof businessRegistrationNumberGstin !== "string" ||
       typeof description !== "string" ||
       typeof details !== "string" ||
-      typeof employmentId !== "string" ||
-      typeof facebookUrl !== "string" ||
-      typeof instagramUrl !== "string" ||
       typeof category !== "string" ||
       !location ||
-      typeof location !== "object" ||
-      !location.city ||
-      typeof location.city !== "string" ||
-      !location.state ||
-      typeof location.state !== "string" ||
-      typeof location.latitude !== "number" ||
-      typeof location.longitude !== "number" ||
-      // typeof location.address !== "string" ||
-      typeof logoUrl !== "string" ||
-      typeof w !== "number" ||
-      typeof h !== "number"
+      typeof location !== "object"
     ) {
       return res.status(400).json({ error: "Invalid or missing fields." });
     }
@@ -190,21 +178,58 @@ const confirmAndShift = async (req, res) => {
     if (h < 1) {
       return res.status(400).json({ error: "h must be ≥ 1." });
     }
-
-    const numberOfCells = w * h;
-    const baseUnitPrice = 600;
     // const gstRate = 0.18;
     // const unitPriceWithGST = baseUnitPrice + baseUnitPrice * gstRate;
-    const totalAmount1 = numberOfCells * baseUnitPrice;
-    const totalAmountWithGst = totalAmount1 * 0.18;
-    const totalAmount = totalAmount1 + totalAmountWithGst;
+    const numberOfCells = w * h;
+    // const baseUnitPrice = 600;
 
-    const razorpayOrder = await razorpay.orders.create({
-      amount: totalAmount * 100,
-      currency: "INR",
-      receipt: `receipt_${Date.now()}`,
-      payment_capture: 1,
+    // const totalAmount1 = numberOfCells * baseUnitPrice;
+    // const totalAmountWithGst = totalAmount1 * 0.18;
+    // const totalAmount = totalAmount1 + totalAmountWithGst;
+    //Create subscription order instead of normal order
+    // const basePricePerTile = 60; // base ₹60
+    // const gstRate = 0.18;
+    // const priceWithGST = basePricePerTile + basePricePerTile * gstRate; // ₹60 + 18% = ₹70.8
+    // const priceWithGSTInPaise = Math.round(priceWithGST * 100); // ₹600 per tile (one time)
+    // const monthlyAmount = numberOfCells * priceWithGSTInPaise; // ₹60 per tile per month
+
+    // let planAmount = monthlyAmount;
+    // let totalCount = 12;
+    // let interval = 1;
+
+    // if (planType === "yearly") {
+    //   planAmount = numberOfCells * priceWithGSTInPaise * 12; // ₹60×12 per tile (1 year)
+    //   totalCount = duration; // Razorpay treats each as one billing cycle per year
+    //   interval = 12; // 12 months interval between yearly payments
+    // }
+    // ✅ Setup fee calculation (₹600 per tile + 18% GST)
+    const setupBasePrice = 600;
+    const gstRate = 0.18;
+    const setupPriceWithGST = setupBasePrice * (1 + gstRate); // ₹708 per block
+    const setupPriceWithGSTInPaise = Math.round(setupPriceWithGST * 100); // 70800 paise
+    const totalSetupAmount = numberOfCells * setupPriceWithGST; // e.g. 4 * 708 = 2832 ₹
+    const totalSetupAmountInPaise = Math.round(totalSetupAmount * 100);
+
+    // ✅ Monthly plan price (₹60 + 18% GST = ₹70.8 per tile)
+    const monthlyBasePrice = 60;
+    const monthlyPriceWithGST = monthlyBasePrice * (1 + gstRate); // ₹70.8 per block
+    const monthlyPriceWithGSTInPaise = Math.round(monthlyPriceWithGST * 100);
+    const monthlyPlanAmount = numberOfCells * monthlyPriceWithGSTInPaise; // ₹70.8 × c
+    const plan = await razorpay.plans.create({
+      period: "monthly",
+      interval: 1,
+      item: {
+        name: `${brandName} ${planType} plan`,
+        amount: monthlyPlanAmount,
+        currency: "INR",
+      },
     });
+    // const razorpayOrder = await razorpay.orders.create({
+    //   amount: totalAmount * 100,
+    //   currency: "INR",
+    //   receipt: `receipt_${Date.now()}`,
+    //   payment_capture: 1,
+    // });
     const { latitude, longitude } = location;
     const locationWithCoordinates = {
       ...location,
@@ -233,9 +258,9 @@ const confirmAndShift = async (req, res) => {
         xEnd: w,
         yEnd: h,
         owner: req.user._id,
-        orderId: razorpayOrder.id,
+        orderId: plan.id,
         paymentStatus: "initiated",
-        totalAmount,
+        totalAmount: totalSetupAmount,
       });
       await newBlock.save();
       if (employmentId) {
@@ -250,14 +275,102 @@ const confirmAndShift = async (req, res) => {
           employee: empId._id,
         });
       }
+      // const now = new Date();
+
+      // // Add 1 month
+      // const oneMonthLater = new Date();
+      // oneMonthLater.setMonth(now.getMonth() + 1);
+
+      // // Get timestamp (in milliseconds)
+      // const timestamp = oneMonthLater.getTime();
+
+      // console.log(timestamp);
+      // const timestampInSeconds = Math.floor(oneMonthLater.getTime() / 1000);
+      // console.log(timestampInSeconds);
+
+      const oneMonthLater = new Date();
+      oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+      const startAtSeconds = Math.floor(oneMonthLater.getTime() / 1000);
+
+      // const addons = [
+      //   {
+      //     item: {
+      //       name: "Initial Setup Fee",
+      //       amount: totalAmount,
+      //       currency: "INR",
+      //     },
+      //   },
+      // ];
+      // if (planType === "yearly") {
+      //   addons.push({
+      //     item: {
+      //       name: `First Year Payment (${duration} Year${
+      //         duration > 1 ? "s" : ""
+      //       })`,
+      //       amount: planAmount * duration, // full yearly amount up front
+      //       currency: "INR",
+      //     },
+      //   });
+      // }
+      // console.log(timestampInSeconds);
+      const subscription = await razorpay.subscriptions.create({
+        plan_id: plan.id,
+        total_count: 1200,
+        customer_notify: 1,
+        start_at: startAtSeconds,
+        addons: [
+          {
+            item: {
+              name: "Initial Setup Fee",
+              amount: totalSetupAmountInPaise,
+              currency: "INR",
+            },
+          },
+        ],
+        notes: {
+          brandBlockId: newBlock._id,
+          userId: req.user._id.toString(),
+          planType,
+          // duration,
+        },
+      });
+      // console.log(subscription);
+      await BrandBlock.findByIdAndUpdate(
+        newBlock._id,
+        {
+          orderId: subscription.id,
+          subscriptionId: subscription.id,
+          planId: plan.id,
+          subscriptionStatus: subscription.status,
+          subsscriptionPlantType: planType,
+          startAt: new Date(subscription.start_at * 1000),
+          endAt: subscription.end_at
+            ? new Date(subscription.end_at * 1000)
+            : null,
+          chargeAt: subscription.charge_at
+            ? new Date(subscription.charge_at * 1000)
+            : null,
+          nextPaymentDate: subscription.current_end
+            ? new Date(subscription.current_end * 1000)
+            : null,
+          initialAmount: totalSetupAmount,
+          recurringAmount: numberOfCells * monthlyPriceWithGST,
+          totalBillingCycles: subscription.total_count || 12,
+          paymentStatus: "initiated",
+        },
+        { new: true }
+      );
+      // save the details here in brand block schema
+
       return res.status(200).json({
         success: true,
         data: {
           order: {
-            id: razorpayOrder.id,
-            amount: razorpayOrder.amount,
-            currency: razorpayOrder.currency,
-            receipt: razorpayOrder.receipt,
+            id: subscription.id,
+            planId: plan.id,
+            amount: totalSetupAmount,
+            monthlyAmount: (numberOfCells * monthlyPriceWithGST).toFixed(2),
+            currency: "INR",
           },
           blockId: newBlock._id,
         },
@@ -274,6 +387,57 @@ const confirmAndShift = async (req, res) => {
     return res.status(500).json({ error: "Server error initiating purchase." });
   }
 };
+
+// exports.verifySubscription = async (req, res) => {
+//   try {
+//     const {
+//       razorpay_payment_id,
+//       razorpay_subscription_id,
+//       razorpay_signature,
+//       brandBlockId,
+//     } = req.body;
+
+//     if (
+//       !razorpay_payment_id ||
+//       !razorpay_subscription_id ||
+//       !razorpay_signature
+//     ) {
+//       return res.status(400).json({ error: "Missing required fields." });
+//     }
+
+//     const generatedSignature = crypto
+//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+//       .update(razorpay_payment_id + "|" + razorpay_subscription_id)
+//       .digest("hex");
+
+//     if (generatedSignature !== razorpay_signature) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid signature verification failed.",
+//       });
+//     }
+
+//     // ✅ Update payment status in DB
+//     await BrandBlock.findByIdAndUpdate(brandBlockId, {
+//       paymentStatus: "success",
+//       paymentId: razorpay_payment_id,
+//       subscriptionId: razorpay_subscription_id,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Subscription payment verified successfully.",
+//     });
+//   } catch (err) {
+//     console.error("Error verifying subscription:", err);
+//     return res.status(500).json({
+//       success: false,
+//       error: "Server error verifying subscription.",
+//       details: err.message,
+//     });
+//   }
+// };
+
 const sendProposal = async (req, res) => {
   try {
     const {
@@ -838,7 +1002,6 @@ const createSubscription = async (req, res) => {
     });
 
     // Start in 5 minutes to allow checkout flow
-    // const startTime = Math.floor(Date.now() / 1000) + 5 * 60;
 
     // Addon logic:
     // Monthly → only initial setupFee
@@ -877,7 +1040,7 @@ const createSubscription = async (req, res) => {
         duration,
       },
     });
-    // console.log(subscription.notes);
+    // console.log(subscription);
     // Save metadata
     block.planId = plan.id;
     block.subscriptionId = subscription.id;
@@ -993,14 +1156,18 @@ const updateBlockWithCoords = async (req, res) => {
 
 const verifyPurchase = async (req, res) => {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, blockId } =
-      req.body;
+    const {
+      razorpaySubscriptionId,
+      razorpayPaymentId,
+      razorpaySignature,
+      blockId,
+    } = req.body;
 
     const block = await BrandBlock.findById(blockId);
     if (!block) {
       return res.status(404).json({ error: "Block not found." });
     }
-    if (block.orderId !== razorpayOrderId) {
+    if (block.orderId !== razorpaySubscriptionId) {
       return res.status(400).json({ error: "Order ID mismatch." });
     }
     if (block.paymentStatus === "success") {
@@ -1011,7 +1178,7 @@ const verifyPurchase = async (req, res) => {
 
     const generatedSignature = crypto
       .createHmac("sha256", config.razorpay.keySecret)
-      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .update(`${razorpayPaymentId}|${razorpaySubscriptionId}`)
       .digest("hex");
 
     if (generatedSignature !== razorpaySignature) {
@@ -1022,8 +1189,18 @@ const verifyPurchase = async (req, res) => {
 
     block.paymentId = razorpayPaymentId;
     block.paymentStatus = "success";
-    const razorpayOrder = await razorpay.orders.fetch(razorpayOrderId);
-    const paidAmountINR = razorpayOrder.amount / 100;
+    let paidAmountINR = 0;
+    const razorpaySubscription = await razorpay.subscriptions.fetch(
+      razorpaySubscriptionId
+    );
+
+    if (razorpaySubscription?.plan?.item?.amount) {
+      paidAmountINR = razorpaySubscription.plan.item.amount / 100;
+    } else if (razorpaySubscription?.plan_id) {
+      const plan = await razorpay.plans.fetch(razorpaySubscription.plan_id);
+      paidAmountINR = plan?.item?.amount ? plan.item.amount / 100 : 0;
+    }
+
     if (!block.totalAmount) {
       block.totalAmount = paidAmountINR;
     } else {
@@ -1032,6 +1209,19 @@ const verifyPurchase = async (req, res) => {
 
     block.pendingAmount = 0;
     await block.save();
+    if (req.user) {
+      const userUpdateQuery = req.user.firebaseUid
+        ? { firebaseUid: req.user.firebaseUid }
+        : { _id: req.user._id };
+
+      const user = await User.findOneAndUpdate(
+        userUpdateQuery,
+        { isSubscriptionActive: true },
+        { new: true }
+      );
+
+      console.log("Subscription activated for user:", user?.email || "unknown");
+    }
     if (req.user && block.paymentStatus === "success") {
       try {
         await sendEmail({
@@ -1116,7 +1306,7 @@ const verifyPurchase = async (req, res) => {
               <tr>
                 <td style="padding: 8px; border: 1px solid #eee;"><strong>Order ID:</strong></td>
                 <td style="padding: 8px; border: 1px solid #eee;">${
-                  block.orderId
+                  block.subscriptionId
                 }</td>
               </tr>
               <tr>
