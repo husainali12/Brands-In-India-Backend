@@ -316,7 +316,7 @@ const confirmAndShift = async (req, res) => {
       // console.log(timestampInSeconds);
       const subscription = await razorpay.subscriptions.create({
         plan_id: plan.id,
-        total_count: 1200,
+        total_count: 240,
         customer_notify: 1,
         start_at: startAtSeconds,
         addons: [
