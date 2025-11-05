@@ -159,6 +159,19 @@ const confirmAndShift = async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: "Authentication required." });
     }
+    await BrandBlock.updateMany(
+      {
+        $or: [{ brandEmailId }, { brandContactNo }],
+        paymentStatus: "initiated",
+      },
+      {
+        $set: {
+          brandEmailId: "",
+          brandContactNo: "",
+        },
+      }
+    );
+
     console.log(planType, duration);
     if (
       typeof brandName !== "string" ||
