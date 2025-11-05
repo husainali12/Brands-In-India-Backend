@@ -159,18 +159,11 @@ const confirmAndShift = async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: "Authentication required." });
     }
-    await BrandBlock.updateMany(
-      {
-        $or: [{ brandEmailId }, { brandContactNo }],
-        paymentStatus: "initiated",
-      },
-      {
-        $set: {
-          brandEmailId: null,
-          brandContactNo: null,
-        },
-      }
-    );
+    await BrandBlock.deleteMany({
+      brandEmailId,
+      brandContactNo,
+      paymentStatus: "initiated",
+    });
 
     console.log(planType, duration);
     if (
@@ -474,7 +467,11 @@ const sendProposal = async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: "Authentication required." });
     }
-
+    await BrandBlock.deleteMany({
+      brandEmailId,
+      brandContactNo,
+      paymentStatus: "initiated",
+    });
     // Basic validation (same as your version)
     if (
       typeof brandName !== "string" ||
