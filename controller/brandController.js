@@ -166,8 +166,8 @@ const confirmAndShift = async (req, res) => {
       },
       {
         $set: {
-          brandEmailId: "",
-          brandContactNo: "",
+          brandEmailId: null,
+          brandContactNo: null,
         },
       }
     );
