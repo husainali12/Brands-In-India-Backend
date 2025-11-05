@@ -1468,7 +1468,7 @@ const getBlocksByOwner = async (req, res) => {
       )
       .populate({
         path: "clickDetails.userId",
-        select: "name email photoURL",
+        select: "name email phone photoURL",
         model: "User",
       })
       .sort({ createdAt: -1 })
