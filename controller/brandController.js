@@ -688,6 +688,116 @@ const verifyPaymentLink = async (req, res) => {
     block.paymentLinkId = razorpay_payment_link_id;
     await block.save();
 
+    const numberOfCells = block.totalBlocks;
+    const basePricePerTile = 60;
+    const gstRate = 0.18;
+    const priceWithGST = basePricePerTile + basePricePerTile * gstRate; // ₹70.8
+    const priceWithGSTInPaise = Math.round(priceWithGST * 100);
+    const monthlyAmount = numberOfCells * priceWithGSTInPaise; // monthly in paise
+
+    // Subscription start date → next month
+    const now = new Date();
+    const oneMonthLater = new Date();
+    oneMonthLater.setMonth(now.getMonth() + 1);
+    const startAt = Math.floor(oneMonthLater.getTime() / 1000);
+
+    // Create Razorpay plan (monthly)
+    const plan = await razorpay.plans.create({
+      period: "monthly",
+      interval: 1,
+      item: {
+        name: `${block.brandName} monthly plan`,
+        amount: monthlyAmount,
+        currency: "INR",
+      },
+    });
+
+    // Create subscription with setup fee as addon
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: plan.id,
+      total_count: 240,
+      customer_notify: 1,
+      start_at: startAt,
+      addons: [
+        {
+          item: {
+            name: "Initial Setup Fee",
+            amount: Math.round(block.totalAmount * 100), // setup fee in paise
+            currency: "INR",
+          },
+        },
+      ],
+      notes: {
+        brandBlockId: block._id.toString(),
+        userId: req.user._id.toString(),
+      },
+    });
+
+    // ✅ Step 4: Update DB
+    block.subscriptionId = subscription.id;
+    block.orderId = subscription.id;
+    // block.subscriptionId = subscription.id;
+    block.planId = plan.id;
+    block.subscriptionStatus = subscription.status;
+    block.subsscriptionPlantType = "Monthly";
+    block.startAt = new Date(subscription.start_at * 1000);
+    block.endAt = subscription.end_at
+      ? new Date(subscription.end_at * 1000)
+      : null;
+    block.chargeAt = subscription.charge_at
+      ? new Date(subscription.charge_at * 1000)
+      : null;
+    block.nextPaymentDate = subscription.current_end
+      ? new Date(subscription.current_end * 1000)
+      : null;
+    block.initialAmount = block.totalAmount;
+    block.recurringAmount = numberOfCells * priceWithGST;
+    block.totalBillingCycles = subscription.total_count || 12;
+    await block.save();
+
+    // ✅ Step 5: Activate user's subscription
+    await User.findOneAndUpdate(
+      { _id: req.user._id },
+      { isSubscriptionActive: true },
+      { new: true }
+    );
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(500).json({ error: "User not found" });
+    }
+    if (user && block.paymentStatus === "success") {
+      try {
+        const invoicePath = await generateInvoicePDF(block, user);
+        await sendEmail({
+          to: user.email,
+          subject: `🧾 Invoice for your Brand Purchase - ${block.brandName}`,
+          html: `
+        <p>Hi ${user.name || "User"},</p>
+        <p>Thank you for your payment! Your subscription has been activated.</p>
+        <p>Attached is your invoice for reference.</p>
+        <p><strong>Subscription ID:</strong> ${block.subscriptionId}</p>
+        <p><strong>Plan:</strong> ${block.subsscriptionPlantType} (${
+            block.totalBlocks
+          } tiles)</p>
+        <p><strong>Total Paid:</strong> ₹${block.totalAmount.toFixed(2)}</p>
+        <p>We appreciate your business with <b>Brands In India</b>.</p>
+        <br/>
+        <p>Regards,<br/>Brands In India Team</p>
+      `,
+          attachments: [
+            {
+              filename: `Invoice_${block.brandName}.pdf`,
+              path: invoicePath,
+            },
+          ],
+        });
+      } catch (err) {
+        console.error("Email sending failed:", err);
+      }
+    }
+    await reflowAllBlocks();
+
     return res.status(200).json({
       success: true,
       message: "Payment verified successfully.",
