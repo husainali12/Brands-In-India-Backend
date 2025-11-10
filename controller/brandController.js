@@ -892,6 +892,7 @@ const verifySubscriptionPayment = async (req, res) => {
       block.paymentStatus = "success";
       block.paymentId = razorpay_payment_id;
       await block.save();
+      await reflowAllBlocks();
     }
 
     res.status(200).json({
