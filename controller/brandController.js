@@ -164,6 +164,16 @@ const confirmAndShift = async (req, res) => {
       brandContactNo,
       paymentStatus: "initiated",
     });
+    const existedBrandEmail = await BrandBlock.findOne({ brandEmailId });
+    if (existedBrandEmail) {
+      return res.status(401).json({ error: "This Brand Email already exist!" });
+    }
+    const existBrandContact = await BrandBlock.findOne({ brandContactNo });
+    if (existBrandContact) {
+      return res
+        .status(401)
+        .json({ error: "This Brand Contact already exist!" });
+    }
 
     console.log(planType, duration);
     if (

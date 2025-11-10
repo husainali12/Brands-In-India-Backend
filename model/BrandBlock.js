@@ -14,7 +14,7 @@ const BrandBlockSchema = new mongoose.Schema({
   brandContactNo: {
     type: String,
     validate: [validator.isMobilePhone, "Please provide correct phone number!"],
-    unique: true,
+    // unique: true,
   },
   // locationUrl: {
   //   type: String,
@@ -38,7 +38,7 @@ const BrandBlockSchema = new mongoose.Schema({
   brandEmailId: {
     type: String,
     // required: [true, "Please add an email"],
-    unique: true,
+    // unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
       "Please add a valid email",
