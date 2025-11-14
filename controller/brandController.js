@@ -173,7 +173,7 @@ const confirmAndShift = async (req, res) => {
       employmentId,
       w,
       h,
-      planType = "monthly",
+      planType = "",
       duration = 1,
     } = req.body;
 
@@ -253,7 +253,12 @@ const confirmAndShift = async (req, res) => {
     const monthlyPriceWithGST = monthlyBasePrice * (1 + gstRate); // ₹70.8 per block
     const monthlyPriceWithGSTInPaise = Math.round(monthlyPriceWithGST * 100);
     const monthlyPlanAmount = numberOfCells * monthlyPriceWithGSTInPaise; // ₹70.8 × c
-    const plan = await razorpay.plans.create({
+
+    const yearlyPriceWithGST = monthlyPriceWithGST * 12; // e.g. 70.8 * 12
+    const yearlyPriceWithGSTInPaise = Math.round(yearlyPriceWithGST * 100);
+    const yearlyPlanAmountInPaise = numberOfCells * yearlyPriceWithGSTInPaise; // paise
+
+    let planPayLoad = {
       period: "monthly",
       interval: 1,
       item: {
@@ -261,7 +266,22 @@ const confirmAndShift = async (req, res) => {
         amount: monthlyPlanAmount,
         currency: "INR",
       },
-    });
+    };
+    let totalBillingCycles = 240; // default monthly long-running
+    if (planType === "yearly") {
+      planPayLoad = {
+        period: "yearly",
+        interval: 1,
+        item: {
+          name: `${brandName} yearly plan`,
+          amount: yearlyPlanAmountInPaise,
+          currency: "INR",
+        },
+      };
+      // total_count should equal duration (number of yearly cycles)
+      // totalBillingCycles = duration || 1;
+    }
+    const plan = await razorpay.plans.create(planPayLoad);
     // const razorpayOrder = await razorpay.orders.create({
     //   amount: totalAmount * 100,
     //   currency: "INR",
@@ -325,10 +345,27 @@ const confirmAndShift = async (req, res) => {
       // console.log(timestamp);
       // const timestampInSeconds = Math.floor(oneMonthLater.getTime() / 1000);
       // console.log(timestampInSeconds);
+      const nowSec = Math.floor(Date.now() / 1000);
+      const bufferSeconds = 120;
+      let startAtSeconds;
+      if (planType === "yearly") {
+        // subscription should next bill after 365 days (one year) from now
+        startAtSeconds = nowSec + bufferSeconds + 365 * 24 * 3600;
+      } else {
+        // monthly -> start after 30 days
+        startAtSeconds = nowSec + bufferSeconds + 30 * 24 * 3600;
+      }
+      // let startAtSeconds;
+      // if (planType === "yearly") {
+      //   startAtSeconds = Math.floor(Date.now() / 1000) + 120; // add buffer
+      // }
 
-      const oneMonthLater = new Date();
-      oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
-      const startAtSeconds = Math.floor(oneMonthLater.getTime() / 1000);
+      // // MONTHLY plan → start 1 month later
+      // else {
+      //   const oneMonthLater = new Date();
+      //   oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+      //   startAtSeconds = Math.floor(oneMonthLater.getTime() / 1000);
+      // }
 
       // const addons = [
       //   {
@@ -351,20 +388,41 @@ const confirmAndShift = async (req, res) => {
       //   });
       // }
       // console.log(timestampInSeconds);
+      let subscriptionPlanId = plan.id;
+      let addons = [];
+      // let totalBillingCycles = 240; // monthly default
+
+      if (planType === "yearly") {
+        // Yearly amount per subscription cycle
+        const yearlyAmount = monthlyPriceWithGST * numberOfCells * 12;
+        const yearlyAmountInPaise = Math.round(yearlyAmount * 100);
+
+        const initialDeduction = totalSetupAmountInPaise + yearlyAmountInPaise;
+
+        addons.push({
+          item: {
+            name: "Initial Setup Fee + First Year Payment",
+            amount: initialDeduction,
+            currency: "INR",
+          },
+        });
+
+        // totalBillingCycles = duration; // number of yearly cycles (default 1)
+      } else {
+        addons.push({
+          item: {
+            name: "Initial Setup Fee",
+            amount: totalSetupAmountInPaise,
+            currency: "INR",
+          },
+        });
+      }
       const subscription = await razorpay.subscriptions.create({
-        plan_id: plan.id,
-        total_count: 240,
+        plan_id: subscriptionPlanId,
+        total_count: planType === "monthly" ? 240 : 1,
         customer_notify: 1,
         start_at: startAtSeconds,
-        addons: [
-          {
-            item: {
-              name: "Initial Setup Fee",
-              amount: totalSetupAmountInPaise,
-              currency: "INR",
-            },
-          },
-        ],
+        addons,
         notes: {
           brandBlockId: newBlock._id,
           userId: req.user._id.toString(),
@@ -392,7 +450,10 @@ const confirmAndShift = async (req, res) => {
             ? new Date(subscription.current_end * 1000)
             : null,
           initialAmount: totalSetupAmount,
-          recurringAmount: numberOfCells * monthlyPriceWithGST,
+          recurringAmount:
+            planType === "yearly"
+              ? monthlyPriceWithGST * numberOfCells * 12
+              : numberOfCells * monthlyPriceWithGST,
           totalBillingCycles: subscription.total_count || 12,
           paymentStatus: "initiated",
         },
@@ -493,6 +554,8 @@ const sendProposal = async (req, res) => {
       employmentId,
       w,
       h,
+      planType = "",
+      duration = 1,
     } = req.body;
 
     if (!req.user || !req.user._id) {
@@ -548,12 +611,28 @@ const sendProposal = async (req, res) => {
     }
 
     const numberOfCells = w * h;
-    // const unitPrice = 500;
-    // const totalAmount = numberOfCells * unitPrice;
-    const baseUnitPrice = 600;
-    const gstRate = 0.18;
-    const unitPriceWithGST = baseUnitPrice + baseUnitPrice * gstRate;
-    const totalAmount = numberOfCells * unitPriceWithGST;
+    // // const unitPrice = 500;
+    // // const totalAmount = numberOfCells * unitPrice;
+    // const baseUnitPrice = 600;
+    // const gstRate = 0.18;
+    // const unitPriceWithGST = baseUnitPrice + baseUnitPrice * gstRate;
+    // const totalAmount = numberOfCells * unitPriceWithGST;
+    const baseSetupFee = 600;
+    const gst = 0.18;
+    const setupFeeWithGST = baseSetupFee * (1 + gst); // 708
+
+    const baseMonthlyPrice = 60;
+    const monthlyPriceWithGST = baseMonthlyPrice * (1 + gst); // 70.8
+
+    const setupFee = numberOfCells * setupFeeWithGST;
+    const monthlyRecurring = numberOfCells * monthlyPriceWithGST;
+    const yearlyRecurring = monthlyRecurring * 12;
+
+    if (planType === "yearly") {
+      totalAmount = setupFee + yearlyRecurring;
+    } else {
+      totalAmount = setupFee;
+    }
 
     const { latitude, longitude } = location;
     const locationWithCoordinates = {
@@ -610,6 +689,7 @@ const sendProposal = async (req, res) => {
     // ✅ Step 3: Update block with payment link info
     newBlock.paymentLinkId = paymentLink.id;
     newBlock.paymentLinkUrl = paymentLink.short_url;
+    newBlock.subsscriptionPlantType = planType;
     await newBlock.save();
 
     // ✅ Step 4: Optional - create employee record
@@ -622,26 +702,26 @@ const sendProposal = async (req, res) => {
     }
 
     // ✅ Step 5: Send email with payment link
-    await sendEmail({
-      to: req.user.email,
-      subject: `Complete your payment for ${brandName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2>Hello ${req.user.name || "there"},</h2>
-          <p>You have initiated a proposal for <strong>${brandName}</strong>.</p>
-          <p>Total Tiles: <strong>${numberOfCells}</strong></p>
-          <p>Amount Payable: <strong>₹${totalAmount}</strong></p>
-          <p>To complete your payment, please click the link below:</p>
-          <a href="${paymentLink.short_url}" 
-             style="background-color:#007bff; color:white; padding:10px 20px; border-radius:6px; text-decoration:none;">
-             Pay Now
-          </a>
-          <p>This link will expire after a few hours. Please complete your payment promptly.</p>
-          <br>
-          <p>Regards,<br><strong>Brands In India Team</strong></p>
-        </div>
-      `,
-    });
+    // await sendEmail({
+    //   to: req.user.email,
+    //   subject: `Complete your payment for ${brandName}`,
+    //   html: `
+    //     <div style="font-family: Arial, sans-serif; color: #333;">
+    //       <h2>Hello ${req.user.name || "there"},</h2>
+    //       <p>You have initiated a proposal for <strong>${brandName}</strong>.</p>
+    //       <p>Total Tiles: <strong>${numberOfCells}</strong></p>
+    //       <p>Amount Payable: <strong>₹${totalAmount}</strong></p>
+    //       <p>To complete your payment, please click the link below:</p>
+    //       <a href="${paymentLink.short_url}"
+    //          style="background-color:#007bff; color:white; padding:10px 20px; border-radius:6px; text-decoration:none;">
+    //          Pay Now
+    //       </a>
+    //       <p>This link will expire after a few hours. Please complete your payment promptly.</p>
+    //       <br>
+    //       <p>Regards,<br><strong>Brands In India Team</strong></p>
+    //     </div>
+    //   `,
+    // });
 
     return res.status(200).json({
       success: true,
@@ -729,71 +809,157 @@ const verifyPaymentLink = async (req, res) => {
     block.paymentLinkId = razorpay_payment_link_id;
     await block.save();
 
-    const numberOfCells = block.totalBlocks;
-    const basePricePerTile = 60;
-    const gstRate = 0.18;
-    const priceWithGST = basePricePerTile + basePricePerTile * gstRate; // ₹70.8
-    const priceWithGSTInPaise = Math.round(priceWithGST * 100);
-    const monthlyAmount = numberOfCells * priceWithGSTInPaise; // monthly in paise
+    // const numberOfCells = block.totalBlocks;
+    // const basePricePerTile = 60;
+    // const gstRate = 0.18;
+    // const priceWithGST = basePricePerTile + basePricePerTile * gstRate; // ₹70.8
+    // const priceWithGSTInPaise = Math.round(priceWithGST * 100);
+    // const monthlyAmount = numberOfCells * priceWithGSTInPaise; // monthly in paise
 
-    // Subscription start date → next month
+    // // Subscription start date → next month
+    // const now = new Date();
+    // const oneMonthLater = new Date();
+    // oneMonthLater.setMonth(now.getMonth() + 1);
+    // const startAt = Math.floor(oneMonthLater.getTime() / 1000);
+
+    // // Create Razorpay plan (monthly)
+    // const plan = await razorpay.plans.create({
+    //   period: "monthly",
+    //   interval: 1,
+    //   item: {
+    //     name: `${block.brandName} monthly plan`,
+    //     amount: monthlyAmount,
+    //     currency: "INR",
+    //   },
+    // });
+
+    // // Create subscription with setup fee as addon
+    // const subscription = await razorpay.subscriptions.create({
+    //   plan_id: plan.id,
+    //   total_count: 240,
+    //   customer_notify: 1,
+    //   start_at: startAt,
+    //   addons: [
+    //     {
+    //       item: {
+    //         name: "Initial Setup Fee",
+    //         amount: Math.round(block.totalAmount * 100), // setup fee in paise
+    //         currency: "INR",
+    //       },
+    //     },
+    //   ],
+    //   notes: {
+    //     brandBlockId: block._id.toString(),
+    //     userId: req.user._id.toString(),
+    //   },
+    // });
+
+    const baseMonthlyPrice = 60;
+    const gst = 0.18;
+    const monthlyPriceWithGST = baseMonthlyPrice * (1 + gst); // 70.8
+
+    const monthlyRecurringAmount = block.totalBlocks * monthlyPriceWithGST;
+    const yearlyRecurringAmount = monthlyRecurringAmount * 12;
+
     const now = new Date();
-    const oneMonthLater = new Date();
-    oneMonthLater.setMonth(now.getMonth() + 1);
-    const startAt = Math.floor(oneMonthLater.getTime() / 1000);
+    const startAt = new Date(now);
 
-    // Create Razorpay plan (monthly)
-    const plan = await razorpay.plans.create({
-      period: "monthly",
-      interval: 1,
-      item: {
-        name: `${block.brandName} monthly plan`,
-        amount: monthlyAmount,
-        currency: "INR",
-      },
-    });
+    //------------------------------------------------------
+    // MONTHLY PLAN
+    //------------------------------------------------------
+    if (block.subsscriptionPlantType === "monthly") {
+      startAt.setMonth(startAt.getMonth() + 1); // start next month
 
-    // Create subscription with setup fee as addon
-    const subscription = await razorpay.subscriptions.create({
-      plan_id: plan.id,
-      total_count: 240,
-      customer_notify: 1,
-      start_at: startAt,
-      addons: [
-        {
-          item: {
-            name: "Initial Setup Fee",
-            amount: Math.round(block.totalAmount * 100), // setup fee in paise
-            currency: "INR",
-          },
+      const plan = await razorpay.plans.create({
+        period: "monthly",
+        interval: 1,
+        item: {
+          name: `${block.brandName} Monthly Subscription`,
+          amount: Math.round(monthlyRecurringAmount * 100),
+          currency: "INR",
         },
-      ],
-      notes: {
-        brandBlockId: block._id.toString(),
-        userId: req.user._id.toString(),
-      },
-    });
+      });
+
+      const subscription = await razorpay.subscriptions.create({
+        plan_id: plan.id,
+        start_at: Math.floor(startAt.getTime() / 1000),
+        total_count: 240, // 20 years
+        customer_notify: 1,
+        notes: { blockId: block._id.toString() },
+      });
+
+      block.subscriptionId = subscription.id;
+      block.startAt = new Date(subscription.start_at * 1000);
+      block.endAt = subscription.end_at
+        ? new Date(subscription.end_at * 1000)
+        : null;
+      block.chargeAt = subscription.charge_at
+        ? new Date(subscription.charge_at * 1000)
+        : null;
+      block.nextPaymentDate = subscription.current_end
+        ? new Date(subscription.current_end * 1000)
+        : null;
+      block.totalBillingCycles = subscription.total_count || 12;
+      block.orderId = subscription.id;
+      block.planId = plan.id;
+      block.recurringAmount = monthlyRecurringAmount;
+      block.subscriptionStatus = subscription.status;
+      await block.save();
+    }
+
+    //------------------------------------------------------
+    // YEARLY PLAN
+    //------------------------------------------------------
+    else if (block.subsscriptionPlantType === "yearly") {
+      startAt.setFullYear(startAt.getFullYear() + 1); // next year
+
+      const plan = await razorpay.plans.create({
+        period: "yearly",
+        interval: 1,
+        item: {
+          name: `${block.brandName} Yearly Subscription`,
+          amount: Math.round(yearlyRecurringAmount * 100),
+          currency: "INR",
+        },
+      });
+
+      const subscription = await razorpay.subscriptions.create({
+        plan_id: plan.id,
+        start_at: Math.floor(startAt.getTime() / 1000),
+        total_count: 20,
+        customer_notify: 1,
+        notes: { blockId: block._id.toString() },
+      });
+
+      block.subscriptionId = subscription.id;
+      block.orderId = subscription.id;
+      block.startAt = new Date(subscription.start_at * 1000);
+      block.endAt = subscription.end_at
+        ? new Date(subscription.end_at * 1000)
+        : null;
+      block.chargeAt = subscription.charge_at
+        ? new Date(subscription.charge_at * 1000)
+        : null;
+      block.nextPaymentDate = subscription.current_end
+        ? new Date(subscription.current_end * 1000)
+        : null;
+      block.totalBillingCycles = subscription.total_count || 12;
+      block.planId = plan.id;
+      block.recurringAmount = yearlyRecurringAmount;
+      block.subscriptionStatus = subscription.status;
+      await block.save();
+    }
 
     // ✅ Step 4: Update DB
-    block.subscriptionId = subscription.id;
-    block.orderId = subscription.id;
     // block.subscriptionId = subscription.id;
-    block.planId = plan.id;
-    block.subscriptionStatus = subscription.status;
-    block.subsscriptionPlantType = "Monthly";
-    block.startAt = new Date(subscription.start_at * 1000);
-    block.endAt = subscription.end_at
-      ? new Date(subscription.end_at * 1000)
-      : null;
-    block.chargeAt = subscription.charge_at
-      ? new Date(subscription.charge_at * 1000)
-      : null;
-    block.nextPaymentDate = subscription.current_end
-      ? new Date(subscription.current_end * 1000)
-      : null;
+    // block.orderId = subscription.id;
+    // block.subscriptionId = subscription.id;
+    // block.planId = plan.id;
+    // block.subscriptionStatus = subscription.status;
+    // block.subsscriptionPlantType = block.subsscriptionPlantType;
     block.initialAmount = block.totalAmount;
-    block.recurringAmount = numberOfCells * priceWithGST;
-    block.totalBillingCycles = subscription.total_count || 12;
+    // block.recurringAmount = numberOfCells * priceWithGST;
+    // block.totalBillingCycles = subscription.total_count || 12;
     await block.save();
 
     // ✅ Step 5: Activate user's subscription
