@@ -170,6 +170,7 @@ const confirmAndShift = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      websiteUrl,
       employmentId,
       w,
       h,
@@ -306,6 +307,7 @@ const confirmAndShift = async (req, res) => {
         logoUrl,
         facebookUrl,
         instagramUrl,
+        websiteUrl,
         employmentId,
         location: locationWithCoordinates,
         totalBlocks: w * h,
@@ -321,6 +323,7 @@ const confirmAndShift = async (req, res) => {
         totalAmount: totalSetupAmount,
       });
       await newBlock.save();
+      // console.log(newBlock);
       if (employmentId) {
         const empId = await Emloyee.create({
           empId: employmentId,
@@ -551,6 +554,7 @@ const sendProposal = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      websiteUrl,
       employmentId,
       w,
       h,
@@ -652,6 +656,7 @@ const sendProposal = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      websiteUrl,
       employmentId,
       location: locationWithCoordinates,
       totalBlocks: numberOfCells,
@@ -1836,7 +1841,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(limitNum)
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
       )
       .populate("owner", "name email isBlocked");
     // console.log(blocks);
@@ -1906,7 +1911,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId websiteUrl businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
       )
       .populate({
         path: "clickDetails.userId",
