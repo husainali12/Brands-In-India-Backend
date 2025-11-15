@@ -1767,6 +1767,7 @@ const getAllBlocks = async (req, res) => {
                   brandEmailId: 1,
                   facebookUrl: 1,
                   instagramUrl: 1,
+                  websiteUrl: 1,
                   totalAmount: 1,
                   totalBlocks: 1,
                   orderId: 1,
