@@ -1457,7 +1457,7 @@ const updateBlockWithCoords = async (req, res) => {
     block.w = w ?? block.w;
     block.h = h ?? block.h;
     block.totalBlocks = newBlockCount;
-    await block.save();
+    // await block.save();
     return res.status(200).json({
       success: true,
       message: "Block updated successfully",
