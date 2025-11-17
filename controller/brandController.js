@@ -2892,9 +2892,22 @@ const handleRazorpayWebhook = async (req, res) => {
         razorpaySubscriptionId
       );
       console.log("This is my status of payment: ", status);
-      const block = await BrandBlock.findOne({
-        orderId: razorpaySubscriptionId,
-      });
+      // const block = await BrandBlock.findOne({
+      //   orderId: razorpaySubscriptionId,
+      // });
+      let block = null;
+
+      // 1. Subscription recurring payment
+      if (razorpaySubscriptionId) {
+        block = await BrandBlock.findOne({
+          subscriptionId: razorpaySubscriptionId,
+        });
+      }
+
+      // 2. Initial subscription payment (invoice/order)
+      if (!block && paymentEntity.order_id) {
+        block = await BrandBlock.findOne({ orderId: paymentEntity.order_id });
+      }
       console.log("This is my: ", block);
       if (!block) {
         console.warn(
