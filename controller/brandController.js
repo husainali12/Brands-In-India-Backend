@@ -2624,6 +2624,9 @@ const getTimeSeriesAnalytics = async (req, res) => {
 // Webhook payment verify
 const handleRazorpayWebhook = async (req, res) => {
   const now = () => new Date().toISOString();
+  console.log(`${now()} --- Webhook Hit ---`);
+  console.log(`${now()} Headers:, req.headers`);
+  console.log(`${now()} Body:, req.body`);
   try {
     const rawBody = JSON.stringify(req.body);
     const signature = req.headers["x-razorpay-signature"];
