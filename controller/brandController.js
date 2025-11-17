@@ -828,7 +828,7 @@ const verifyPaymentLink = async (req, res) => {
 
     // Update block with payment info
     //checking razorpay working
-    // block.paymentStatus = "success";
+    block.paymentStatus = "success";
     block.paymentId = razorpay_payment_id;
     block.paymentLinkId = razorpay_payment_link_id;
     await block.save();
@@ -1543,7 +1543,7 @@ const verifyPurchase = async (req, res) => {
 
     block.paymentId = razorpayPaymentId;
     //checking razorpay working
-    // block.paymentStatus = "success";
+    block.paymentStatus = "success";
     let paidAmountINR = 0;
     const razorpaySubscription = await razorpay.subscriptions.fetch(
       razorpaySubscriptionId
