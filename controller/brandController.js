@@ -2656,12 +2656,16 @@ const handleRazorpayWebhook = async (req, res) => {
       .digest("hex");
 
     // Convert to string for JSON parsing
-    const rawBody = req.body.toString('utf8');
+    const rawBody = req.body.toString("utf8");
 
     // Debug logging (remove in production)
     console.log(`${now()} Signature verification:`);
-    console.log(`${now()}   Received signature: ${signature?.substring(0, 20)}...`);
-    console.log(`${now()}   Expected signature: ${expected?.substring(0, 20)}...`);
+    console.log(
+      `${now()}   Received signature: ${signature?.substring(0, 20)}...`
+    );
+    console.log(
+      `${now()}   Expected signature: ${expected?.substring(0, 20)}...`
+    );
     console.log(`${now()}   Raw body length: ${rawBody.length}`);
     console.log(`${now()}   Raw body preview: ${rawBody.substring(0, 100)}...`);
 
@@ -2691,7 +2695,9 @@ const handleRazorpayWebhook = async (req, res) => {
         paymentLink?.reference_id || payment?.notes?.brandBlockId;
       const paymentId = payment?.id;
       const status = paymentLink?.status || payment?.status;
-
+      console.log("This is my link of payment: ", paymentLinkId);
+      console.log("this is my brandblockID: ", referenceId);
+      console.log("This is my status of payment: ", status);
       if (!referenceId) {
         console.warn(`${now()} Missing reference ID (brandBlockId)`);
         return res.status(200).send("Missing reference ID");
@@ -2876,14 +2882,20 @@ const handleRazorpayWebhook = async (req, res) => {
     // Regular Payment
     const paymentEntity = body?.payload?.payment?.entity;
     if (paymentEntity && event?.startsWith("payment.")) {
+      console.log("My payment entity: -------", paymentEntity);
       const razorpayPaymentId = paymentEntity.id;
       const razorpaySubscriptionId = paymentEntity.subscription_id;
       const status = paymentEntity.status;
-
+      console.log("This is my razorpayPaymentId: ", razorpayPaymentId);
+      console.log(
+        "This is my razorpaySubscriptionId: ",
+        razorpaySubscriptionId
+      );
+      console.log("This is my status of payment: ", status);
       const block = await BrandBlock.findOne({
         orderId: razorpaySubscriptionId,
       });
-
+      console.log("This is my: ", block);
       if (!block) {
         console.warn(
           `${now()} ⚠️ No BrandBlock found for subscription ${razorpaySubscriptionId}`
