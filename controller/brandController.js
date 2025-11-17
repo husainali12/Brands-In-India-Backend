@@ -1512,7 +1512,8 @@ const verifyPurchase = async (req, res) => {
     if (!block) {
       return res.status(404).json({ error: "Block not found." });
     }
-    if (block.orderId !== razorpaySubscriptionId) {
+    //change here from orderId to subscriptionID
+    if (block.subscriptionId !== razorpaySubscriptionId) {
       return res.status(400).json({ error: "Order ID mismatch." });
     }
     if (block.paymentStatus === "success") {
