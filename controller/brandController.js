@@ -2634,7 +2634,8 @@ const handleRazorpayWebhook = async (req, res) => {
       return res.status(400).send("Empty request body");
     }
 
-    const rawBody = req.body.toString('utf8');
+    // req.body is a Buffer when using express.raw()
+    // Use Buffer directly for HMAC to avoid encoding issues
     const signature = req.headers["x-razorpay-signature"];
     const secret = config.razorpay.webhookSecret;
 
@@ -2648,14 +2649,26 @@ const handleRazorpayWebhook = async (req, res) => {
       return res.status(400).send("Missing signature");
     }
 
-    // Verify webhook signature using raw body string
+    // Verify webhook signature using raw body Buffer (more reliable than string conversion)
     const expected = crypto
       .createHmac("sha256", secret)
-      .update(rawBody)
+      .update(req.body)
       .digest("hex");
+
+    // Convert to string for JSON parsing
+    const rawBody = req.body.toString('utf8');
+
+    // Debug logging (remove in production)
+    console.log(`${now()} Signature verification:`);
+    console.log(`${now()}   Received signature: ${signature?.substring(0, 20)}...`);
+    console.log(`${now()}   Expected signature: ${expected?.substring(0, 20)}...`);
+    console.log(`${now()}   Raw body length: ${rawBody.length}`);
+    console.log(`${now()}   Raw body preview: ${rawBody.substring(0, 100)}...`);
 
     if (expected !== signature) {
       console.warn(`${now()} Invalid Razorpay webhook signature`);
+      console.warn(`${now()}   Full received: ${signature}`);
+      console.warn(`${now()}   Full expected: ${expected}`);
       return res.status(400).send("Invalid signature");
     }
 
