@@ -29,7 +29,14 @@ mongoose
 
 app.use(cors());
 app.use(morgan("dev"));
-app.use(express.json());
+// Exclude webhook route from JSON parsing to preserve raw body for signature verification
+const jsonParser = express.json();
+app.use((req, res, next) => {
+  if (req.path === "/api/brand/webhook") {
+    return next();
+  }
+  jsonParser(req, res, next);
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(
   fileUpload({
