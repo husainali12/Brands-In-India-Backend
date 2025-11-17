@@ -434,10 +434,11 @@ const confirmAndShift = async (req, res) => {
         },
       });
       // console.log(subscription);
+      // orderId change from subscription.id ---> null
       await BrandBlock.findByIdAndUpdate(
         newBlock._id,
         {
-          orderId: subscription.id,
+          orderId: null,
           subscriptionId: subscription.id,
           planId: plan.id,
           subscriptionStatus: subscription.status,
@@ -2895,6 +2896,26 @@ const handleRazorpayWebhook = async (req, res) => {
       // const block = await BrandBlock.findOne({
       //   orderId: razorpaySubscriptionId,
       // });
+      if (paymentEntity.order_id) {
+        console.log(
+          "🌟 Initial Order Payment Detected:",
+          paymentEntity.order_id
+        );
+
+        const subscriptionFromNotes = paymentEntity.notes?.blockId;
+
+        if (subscriptionFromNotes) {
+          await BrandBlock.findOneAndUpdate(
+            { subscriptionId: subscriptionFromNotes },
+            {
+              orderId: paymentEntity.order_id,
+              paymentId: paymentEntity.id,
+              paymentStatus: "success",
+            }
+          );
+          console.log("✅ Updated BrandBlock with order payment");
+        }
+      }
       let block = null;
 
       // 1. Subscription recurring payment
