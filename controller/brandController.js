@@ -683,6 +683,7 @@ const sendProposal = async (req, res) => {
     });
 
     // ✅ Step 2: Now create the Razorpay payment link using that _id
+    //ADDED 2 IMPORTANT FIELDS
     const paymentLink = await razorpay.paymentLink.create({
       amount: totalAmount * 100,
       currency: "INR",
@@ -692,6 +693,12 @@ const sendProposal = async (req, res) => {
         name: req.user.name,
         email: req.user.email,
         contact: brandContactNo,
+      },
+      reference_id: newBlock._id.toString(),
+      notes: {
+        brandBlockId: newBlock._id.toString(),
+        brandName,
+        planType,
       },
       notify: {
         sms: true,
@@ -2894,7 +2901,7 @@ const handleRazorpayWebhook = async (req, res) => {
       }
     }
 
-    // Regular Payment
+    // Regular Payment working now ✅✅✅✅
     const paymentEntity = body?.payload?.payment?.entity;
     if (paymentEntity && event?.startsWith("payment.")) {
       console.log("My payment entity: -------", paymentEntity);
