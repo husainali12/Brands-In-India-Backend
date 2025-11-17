@@ -2615,6 +2615,303 @@ const getTimeSeriesAnalytics = async (req, res) => {
       .json({ success: false, error: "Failed to fetch analytics" });
   }
 };
+// Webhook payment verify
+const handleRazorpayWebhook = async (req, res) => {
+  const now = () => new Date().toISOString();
+  try {
+    const rawBody = JSON.stringify(req.body);
+    const signature = req.headers["x-razorpay-signature"];
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    if (!secret) {
+      console.error(`${now()} Missing RAZORPAY_WEBHOOK_SECRET`);
+      return res.status(500).send("Server misconfigured");
+    }
+
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("hex");
+
+    if (expected !== signature) {
+      console.warn(`${now()} Invalid Razorpay webhook signature`);
+      return res.status(400).send("Invalid signature");
+    }
+
+    const event = req.body.event;
+    const paymentLink = req.body?.payload?.payment_link?.entity;
+    const payment = req.body?.payload?.payment?.entity;
+
+    console.log(`${now()} Razorpay webhook received: ${event}`);
+
+    //  Handle Payment Link Events
+    if (
+      event?.startsWith("payment_link.") ||
+      paymentLink ||
+      (payment?.payment_link_id && payment?.status)
+    ) {
+      const paymentLinkId = paymentLink?.id || payment?.payment_link_id;
+      const referenceId =
+        paymentLink?.reference_id || payment?.notes?.brandBlockId;
+      const paymentId = payment?.id;
+      const status = paymentLink?.status || payment?.status;
+
+      if (!referenceId) {
+        console.warn(`${now()} Missing reference ID (brandBlockId)`);
+        return res.status(200).send("Missing reference ID");
+      }
+
+      const block = await BrandBlock.findById(referenceId);
+      if (!block) {
+        console.warn(`${now()} No BrandBlock found for ID ${referenceId}`);
+        return res.status(404).send("Block not found");
+      }
+
+      if (event === "payment_link.paid" || status?.toLowerCase() === "paid") {
+        console.log(`${now()} Payment Link Paid for Block ${block._id}`);
+
+        block.paymentStatus = "success";
+        block.paymentId = paymentId;
+        block.paymentLinkId = paymentLinkId;
+        await block.save();
+
+        // Create subscription
+        // const numberOfCells = block.totalBlocks;
+        // const basePricePerTile = 60;
+        // const gstRate = 0.18;
+        // const priceWithGST = basePricePerTile + basePricePerTile * gstRate;
+        // const priceWithGSTInPaise = Math.round(priceWithGST * 100);
+        // const monthlyAmount = numberOfCells * priceWithGSTInPaise;
+
+        // const now = new Date();
+        // const oneMonthLater = new Date();
+        // oneMonthLater.setMonth(now.getMonth() + 1);
+        // const startAt = Math.floor(oneMonthLater.getTime() / 1000);
+        const baseMonthlyPrice = 60;
+        const gst = 0.18;
+        const monthlyPriceWithGST = baseMonthlyPrice * (1 + gst); // 70.8
+
+        const monthlyRecurringAmount = block.totalBlocks * monthlyPriceWithGST;
+        const yearlyRecurringAmount = monthlyRecurringAmount * 12;
+
+        const now = new Date();
+        const startAt = new Date(now);
+        if (block.subsscriptionPlantType === "monthly") {
+          startAt.setMonth(startAt.getMonth() + 1); // start next month
+
+          const plan = await razorpay.plans.create({
+            period: "monthly",
+            interval: 1,
+            item: {
+              name: `${block.brandName} Monthly Subscription`,
+              amount: Math.round(monthlyRecurringAmount * 100),
+              currency: "INR",
+            },
+          });
+
+          const subscription = await razorpay.subscriptions.create({
+            plan_id: plan.id,
+            start_at: Math.floor(startAt.getTime() / 1000),
+            total_count: 240, // 20 years
+            customer_notify: 1,
+            notes: { blockId: block._id.toString() },
+          });
+
+          block.subscriptionId = subscription.id;
+          block.startAt = new Date(subscription.start_at * 1000);
+          block.endAt = subscription.end_at
+            ? new Date(subscription.end_at * 1000)
+            : null;
+          block.chargeAt = subscription.charge_at
+            ? new Date(subscription.charge_at * 1000)
+            : null;
+          block.nextPaymentDate = subscription.current_end
+            ? new Date(subscription.current_end * 1000)
+            : null;
+          block.totalBillingCycles = subscription.total_count || 12;
+          block.orderId = subscription.id;
+          block.planId = plan.id;
+          block.recurringAmount = monthlyRecurringAmount;
+          block.subscriptionStatus = subscription.status;
+          await block.save();
+        } else if (block.subsscriptionPlantType === "yearly") {
+          startAt.setFullYear(startAt.getFullYear() + 1); // next year
+
+          const plan = await razorpay.plans.create({
+            period: "yearly",
+            interval: 1,
+            item: {
+              name: `${block.brandName} Yearly Subscription`,
+              amount: Math.round(yearlyRecurringAmount * 100),
+              currency: "INR",
+            },
+          });
+
+          const subscription = await razorpay.subscriptions.create({
+            plan_id: plan.id,
+            start_at: Math.floor(startAt.getTime() / 1000),
+            total_count: 20,
+            customer_notify: 1,
+            notes: { blockId: block._id.toString() },
+          });
+
+          block.subscriptionId = subscription.id;
+          block.orderId = subscription.id;
+          block.startAt = new Date(subscription.start_at * 1000);
+          block.endAt = subscription.end_at
+            ? new Date(subscription.end_at * 1000)
+            : null;
+          block.chargeAt = subscription.charge_at
+            ? new Date(subscription.charge_at * 1000)
+            : null;
+          block.nextPaymentDate = subscription.current_end
+            ? new Date(subscription.current_end * 1000)
+            : null;
+          block.totalBillingCycles = subscription.total_count || 12;
+          block.planId = plan.id;
+          block.recurringAmount = yearlyRecurringAmount;
+          block.subscriptionStatus = subscription.status;
+          await block.save();
+        }
+
+        block.initialAmount = block.totalAmount;
+        await block.save();
+
+        // Activate user + send invoice
+        const user = await User.findById(block.owner);
+        if (user) {
+          await User.findByIdAndUpdate(
+            user._id,
+            {
+              isSubscriptionActive: true,
+            },
+            { new: true }
+          );
+
+          try {
+            const invoicePath = await generateInvoicePDF(block, user);
+            await sendEmail({
+              to: user.email,
+              subject: `🧾 Invoice for your Brand Purchase - ${block.brandName}`,
+              html: `
+                <p>Hi ${user.name || "User"},</p>
+                <p>Thank you for your payment! Your subscription has been activated.</p>
+                <p>Attached is your invoice for reference.</p>
+                <p><strong>Subscription ID:</strong> ${block.subscriptionId}</p>
+                <p><strong>Plan:</strong> ${block.subsscriptionPlantType} (${
+                block.totalBlocks
+              } tiles)</p>
+                <p><strong>Total Paid:</strong> ₹${block.totalAmount.toFixed(
+                  2
+                )}</p>
+                <br/>
+                <p>Regards,<br/>Brands In India Team</p>
+              `,
+              attachments: [
+                {
+                  filename: `Invoice_${block.brandName}.pdf`,
+                  path: invoicePath,
+                },
+              ],
+            });
+          } catch (err) {
+            console.error("Email sending failed:", err);
+          }
+        }
+
+        await reflowAllBlocks();
+        return res.status(200).send("Payment link processed successfully");
+      }
+
+      // Handle failed or cancelled
+      if (
+        ["payment_link.cancelled", "payment_link.expired"].includes(event) ||
+        status === "failed"
+      ) {
+        console.warn(
+          `${now()}  Payment Link failed/cancelled for ${block._id}`
+        );
+        block.paymentStatus = "failed";
+        await BrandBlock.deleteOne({ _id: block._id });
+        return res.status(200).send("Payment link failed/cancelled");
+      }
+    }
+
+    // Regular Payment
+    const paymentEntity = req.body?.payload?.payment?.entity;
+    if (paymentEntity && event?.startsWith("payment.")) {
+      const razorpayPaymentId = paymentEntity.id;
+      const razorpaySubscriptionId = paymentEntity.subscription_id;
+      const status = paymentEntity.status;
+
+      const block = await BrandBlock.findOne({
+        orderId: razorpaySubscriptionId,
+      });
+
+      if (!block) {
+        console.warn(
+          `${now()} ⚠️ No BrandBlock found for subscription ${razorpaySubscriptionId}`
+        );
+        return res.status(404).send("Block not found");
+      }
+
+      if (status === "captured" || event === "payment.captured") {
+        console.log(`${now()} Subscription Payment Captured`);
+
+        block.paymentId = razorpayPaymentId;
+        block.paymentStatus = "success";
+        block.pendingAmount = 0;
+        await block.save();
+
+        const user = await User.findById(block.owner);
+        if (user) {
+          await User.findByIdAndUpdate(user._id, {
+            isSubscriptionActive: true,
+          });
+
+          try {
+            const invoicePath = await generateInvoicePDF(block, user);
+            await sendEmail({
+              to: user.email,
+              subject: `Invoice for your Brand Purchase - ${block.brandName}`,
+              html: `
+                <p>Hi ${user.name || "User"},</p>
+                <p>Your subscription payment has been received successfully.</p>
+                <p>Attached is your invoice.</p>
+                <br/>
+                <p>Regards,<br/>Brands In India Team</p>
+              `,
+              attachments: [
+                {
+                  filename: `Invoice_${block.brandName}.pdf`,
+                  path: invoicePath,
+                },
+              ],
+            });
+          } catch (err) {
+            console.error("Email sending failed:", err);
+          }
+        }
+
+        await reflowAllBlocks();
+        return res.status(200).send("Payment captured successfully");
+      }
+
+      if (status === "failed" || event === "payment.failed") {
+        console.warn(`${now()} Payment failed for ${block._id}`);
+        block.paymentStatus = "failed";
+        await BrandBlock.deleteOne({ _id: block._id });
+        return res.status(200).send("Payment failed");
+      }
+    }
+
+    console.log(`${now()} ℹUnhandled event: ${event}`);
+    return res.status(200).send("Event ignored");
+  } catch (err) {
+    console.error(" Razorpay Webhook Error:", err);
+    return res.status(500).send("Internal server error");
+  }
+};
 module.exports = {
   uploadLogo,
   confirmAndShift,
@@ -2635,4 +2932,5 @@ module.exports = {
   createSubscription,
   verifySubscriptionPayment,
   reflowAllBlocks,
+  handleRazorpayWebhook,
 };
