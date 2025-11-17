@@ -2626,17 +2626,29 @@ const handleRazorpayWebhook = async (req, res) => {
   const now = () => new Date().toISOString();
   console.log(`${now()} --- Webhook Hit ---`);
   console.log(`${now()} Headers:, req.headers`);
-  console.log(`${now()} Body:, req.body`);
+  console.log(`${now()} Body:, req.body`);
   try {
-    const rawBody = JSON.stringify(req.body);
+    // req.body is a Buffer when using express.raw()
+    if (!req.body) {
+      console.error(`${now()} Empty request body`);
+      return res.status(400).send("Empty request body");
+    }
+
+    const rawBody = req.body.toString('utf8');
     const signature = req.headers["x-razorpay-signature"];
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const secret = config.razorpay.webhookSecret;
 
     if (!secret) {
       console.error(`${now()} Missing RAZORPAY_WEBHOOK_SECRET`);
       return res.status(500).send("Server misconfigured");
     }
 
+    if (!signature) {
+      console.error(`${now()} Missing x-razorpay-signature header`);
+      return res.status(400).send("Missing signature");
+    }
+
+    // Verify webhook signature using raw body string
     const expected = crypto
       .createHmac("sha256", secret)
       .update(rawBody)
@@ -2647,9 +2659,11 @@ const handleRazorpayWebhook = async (req, res) => {
       return res.status(400).send("Invalid signature");
     }
 
-    const event = req.body.event;
-    const paymentLink = req.body?.payload?.payment_link?.entity;
-    const payment = req.body?.payload?.payment?.entity;
+    // Parse the body to access event data
+    const body = JSON.parse(rawBody);
+    const event = body.event;
+    const paymentLink = body?.payload?.payment_link?.entity;
+    const payment = body?.payload?.payment?.entity;
 
     console.log(`${now()} Razorpay webhook received: ${event}`);
 
@@ -2847,7 +2861,7 @@ const handleRazorpayWebhook = async (req, res) => {
     }
 
     // Regular Payment
-    const paymentEntity = req.body?.payload?.payment?.entity;
+    const paymentEntity = body?.payload?.payment?.entity;
     if (paymentEntity && event?.startsWith("payment.")) {
       const razorpayPaymentId = paymentEntity.id;
       const razorpaySubscriptionId = paymentEntity.subscription_id;
