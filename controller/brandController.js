@@ -433,12 +433,22 @@ const confirmAndShift = async (req, res) => {
           // duration,
         },
       });
+      /////////////changes here////////////////////
+      const invoices = await razorpay.invoices.all({
+        subscription_id: subscription.id,
+      });
+      let firstOrderId = null;
+      console.log("My brand invoice: ", invoices);
+      if (invoices.items.length > 0) {
+        firstOrderId = invoices.items[0].order_id;
+      }
+      /////////////changes here////////////////////
       // console.log(subscription);
-      // orderId change from subscription.id ---> null
+      // orderId change from subscription.id ---> firstOrderId
       await BrandBlock.findByIdAndUpdate(
         newBlock._id,
         {
-          orderId: subscription.id,
+          orderId: firstOrderId,
           subscriptionId: subscription.id,
           planId: plan.id,
           subscriptionStatus: subscription.status,
