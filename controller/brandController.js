@@ -2634,7 +2634,7 @@ const handleRazorpayWebhook = async (req, res) => {
       console.error(`${now()} Empty request body`);
       return res.status(400).send("Empty request body");
     }
-
+    console.log("THIS IS MY REQUESTED BODY: ", req.body);
     // req.body is a Buffer when using express.raw()
     // Use Buffer directly for HMAC to avoid encoding issues
     const signature = req.headers["x-razorpay-signature"];
@@ -2658,7 +2658,7 @@ const handleRazorpayWebhook = async (req, res) => {
 
     // Convert to string for JSON parsing
     const rawBody = req.body.toString("utf8");
-
+    console.log("THIS IS MY RAWBODY: ", rawBody);
     // Debug logging (remove in production)
     console.log(`${now()} Signature verification:`);
     console.log(
@@ -2679,10 +2679,13 @@ const handleRazorpayWebhook = async (req, res) => {
 
     // Parse the body to access event data
     const body = JSON.parse(rawBody);
+    console.log("THIS IS MY body: ", body);
     const event = body.event;
+    console.log("THIS IS MY EVENT: ", event);
     const paymentLink = body?.payload?.payment_link?.entity;
     const payment = body?.payload?.payment?.entity;
-
+    console.log("THIS IS MY PAYMENT LINK: ", paymentLink);
+    console.log("THIS IS MY PAYMENT: ", payment);
     console.log(`${now()} Razorpay webhook received: ${event}`);
 
     //  Handle Payment Link Events
