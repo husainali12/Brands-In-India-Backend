@@ -2758,8 +2758,8 @@ const handleRazorpayWebhook = async (req, res) => {
         const monthlyRecurringAmount = block.totalBlocks * monthlyPriceWithGST;
         const yearlyRecurringAmount = monthlyRecurringAmount * 12;
 
-        const now = new Date();
-        const startAt = new Date(now);
+        const currentDate = new Date();
+        const startAt = new Date(currentDate);
         if (block.subsscriptionPlantType === "monthly") {
           startAt.setMonth(startAt.getMonth() + 1); // start next month
 
