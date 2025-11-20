@@ -1933,7 +1933,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId websiteUrl businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl instagramUrl websiteUrl businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
       )
       .populate({
         path: "clickDetails.userId",
@@ -2060,6 +2060,9 @@ const updateBlocksById = async (req, res) => {
     const {
       brandName,
       brandContactNo,
+      facebookUrl,
+      instagramUrl,
+      websiteUrl,
       brandEmailId,
       businessRegistrationNumberGstin,
       description,
@@ -2073,6 +2076,9 @@ const updateBlocksById = async (req, res) => {
     if (brandName) updates.brandName = brandName;
     if (brandContactNo) updates.brandContactNo = brandContactNo;
     if (brandEmailId) updates.brandEmailId = brandEmailId;
+    if (facebookUrl) updates.facebookUrl = facebookUrl;
+    if (instagramUrl) updates.instagramUrl = instagramUrl;
+    if (websiteUrl) updates.websiteUrl = websiteUrl;
     if (businessRegistrationNumberGstin)
       updates.businessRegistrationNumberGstin = businessRegistrationNumberGstin;
     if (description) updates.description = description;
