@@ -1626,6 +1626,70 @@ const verifyPurchase = async (req, res) => {
     return res.status(500).json({ error: "Server error verifying payment." });
   }
 };
+function reflowBlocks(blocks) {
+  const occupiedMap = {};
+  const arranged = [];
+
+  blocks.forEach((block, index) => {
+    const { w, h } = block;
+    let placed = false;
+
+    const rows = Object.keys(occupiedMap).map((n) => parseInt(n, 10));
+    const maxRow = rows.length ? Math.max(...rows) : 0;
+    const scanLimit = maxRow + h;
+
+    outer: for (let y = 0; y <= scanLimit; y++) {
+      for (let x = 0; x <= 20 - w; x++) {
+        let overlap = false;
+
+        for (let row = y; row < y + h; row++) {
+          const rowArr = occupiedMap[row] || Array(20).fill(false);
+          for (let col = x; col < x + w; col++) {
+            if (rowArr[col]) {
+              overlap = true;
+              break;
+            }
+          }
+          if (overlap) break;
+        }
+
+        if (!overlap) {
+          // mark occupied
+          for (let row = y; row < y + h; row++) {
+            if (!occupiedMap[row]) occupiedMap[row] = Array(20).fill(false);
+            for (let col = x; col < x + w; col++) {
+              occupiedMap[row][col] = true;
+            }
+          }
+
+          arranged.push({
+            ...block,
+            x,
+            y,
+            xEnd: x + w,
+            yEnd: y + h,
+            // orderNum assigned AFTER reflow
+          });
+
+          placed = true;
+          break outer;
+        }
+      }
+    }
+
+    if (!placed) {
+      throw new Error(`Grid overflow — cannot place block ${block._id}`);
+    }
+  });
+
+  // Assign final orderNum after placement (top-left first)
+  arranged.forEach((b, i) => {
+    b.orderNum = i + 1;
+  });
+
+  return arranged;
+}
+
 // order history fields for admin/user panel
 const getAllBlocks = async (req, res) => {
   try {
@@ -1835,12 +1899,27 @@ const getAllBlocks = async (req, res) => {
       const [result = { data: [], total: [] }] = await BrandBlock.aggregate(
         pipeline
       );
-      const blocks = result.data || [];
+      let blocks = result.data;
+
+      blocks.sort((a, b) => {
+        if (a.distanceKm !== b.distanceKm) {
+          return a.distanceKm - b.distanceKm;
+        }
+
+        const areaA = a.w * a.h;
+        const areaB = b.w * b.h;
+        return areaB - areaA;
+      });
+
+      // Now flow them into the grid
+      blocks = reflowBlocks(blocks);
+      // console.log(blocks);
+      // blocks.slice(0, 4).map((item) => console.log(item));
       const total = result.total?.[0]?.count || 0;
 
       return res.json({
         success: true,
-        message: "Blocks fetched successfully",
+        message: "Blocks fetched successfully, considering lat lng",
         data: blocks,
         total,
         page: pageNum,
