@@ -1872,6 +1872,7 @@ const getAllBlocks = async (req, res) => {
                   initialAmount: 1,
                   recurringAmount: 1,
                   subscriptionStatus: 1,
+                  subsscriptionPlantType: 1,
                   chargeAt: 1,
                   startAt: 1,
                   endAt: 1,
@@ -1942,7 +1943,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(limitNum)
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus subsscriptionPlantType chargeAt startAt endAt"
       )
       .populate("owner", "name email isBlocked");
     // console.log(blocks);
