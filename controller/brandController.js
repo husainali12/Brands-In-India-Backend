@@ -1,6 +1,7 @@
 const BrandBlock = require("../model/BrandBlock");
 const cloudinary = require("cloudinary").v2;
 const User = require("../model/User");
+const axios = require("axios");
 const Razorpay = require("razorpay");
 const {
   validatePaymentVerification,
@@ -170,6 +171,7 @@ const confirmAndShift = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      websiteUrl,
       employmentId,
       w,
       h,
@@ -306,6 +308,7 @@ const confirmAndShift = async (req, res) => {
         logoUrl,
         facebookUrl,
         instagramUrl,
+        websiteUrl,
         employmentId,
         location: locationWithCoordinates,
         totalBlocks: w * h,
@@ -321,6 +324,7 @@ const confirmAndShift = async (req, res) => {
         totalAmount: totalSetupAmount,
       });
       await newBlock.save();
+      // console.log(newBlock);
       if (employmentId) {
         const empId = await Emloyee.create({
           empId: employmentId,
@@ -430,11 +434,22 @@ const confirmAndShift = async (req, res) => {
           // duration,
         },
       });
+      /////////////changes here////////////////////
+      const invoices = await razorpay.invoices.all({
+        subscription_id: subscription.id,
+      });
+      let firstOrderId = null;
+      console.log("My brand invoice: ", invoices);
+      if (invoices.items.length > 0) {
+        firstOrderId = invoices.items[0].order_id;
+      }
+      /////////////changes here////////////////////
       // console.log(subscription);
+      // orderId change from subscription.id ---> firstOrderId
       await BrandBlock.findByIdAndUpdate(
         newBlock._id,
         {
-          orderId: subscription.id,
+          orderId: firstOrderId,
           subscriptionId: subscription.id,
           planId: plan.id,
           subscriptionStatus: subscription.status,
@@ -551,6 +566,7 @@ const sendProposal = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      websiteUrl,
       employmentId,
       w,
       h,
@@ -652,6 +668,7 @@ const sendProposal = async (req, res) => {
       logoUrl,
       facebookUrl,
       instagramUrl,
+      websiteUrl,
       employmentId,
       location: locationWithCoordinates,
       totalBlocks: numberOfCells,
@@ -667,6 +684,7 @@ const sendProposal = async (req, res) => {
     });
 
     // ✅ Step 2: Now create the Razorpay payment link using that _id
+    //ADDED 2 IMPORTANT FIELDS
     const paymentLink = await razorpay.paymentLink.create({
       amount: totalAmount * 100,
       currency: "INR",
@@ -676,6 +694,12 @@ const sendProposal = async (req, res) => {
         name: req.user.name,
         email: req.user.email,
         contact: brandContactNo,
+      },
+      reference_id: newBlock._id.toString(),
+      notes: {
+        brandBlockId: newBlock._id.toString(),
+        brandName,
+        planType,
       },
       notify: {
         sms: true,
@@ -804,6 +828,7 @@ const verifyPaymentLink = async (req, res) => {
     }
 
     // Update block with payment info
+    //checking razorpay working
     block.paymentStatus = "success";
     block.paymentId = razorpay_payment_id;
     block.paymentLinkId = razorpay_payment_link_id;
@@ -1406,6 +1431,8 @@ const updateBlockWithCoords = async (req, res) => {
     const baseUnitPrice = 600;
     const gstRate = 0.18;
     const unitPrice = baseUnitPrice + baseUnitPrice * gstRate;
+    const baseMonthlyPrice = 60;
+    const monthlyPriceWithGST = baseMonthlyPrice * (1 + gstRate);
     const block = await BrandBlock.findById(blockId);
     if (!block) {
       return res
@@ -1435,29 +1462,107 @@ const updateBlockWithCoords = async (req, res) => {
     // console.log("Old block count:", oldBlockCount);
     // console.log("New block count:", newBlockCount);
     let razorpayOrder = null;
+    let newRecuringAmount = 0;
+    let recuringAmountCalculation = 0;
     if (newBlockCount > oldBlockCount) {
-      extraBlocks = newBlockCount - oldBlockCount;
-      extraPrice = extraBlocks * unitPrice;
+      if (block.subsscriptionPlantType === "yearly") {
+        console.log(block.subsscriptionPlantType);
+        extraBlocks = newBlockCount - oldBlockCount;
+        const yearlyPriceWithGST = monthlyPriceWithGST * 12;
+        console.log(yearlyPriceWithGST);
+        const yearlyPriceWithGSTInPaise = Math.round(yearlyPriceWithGST * 100);
+        console.log(yearlyPriceWithGSTInPaise);
+        const yearlyPlanAmountInPaise = extraBlocks * yearlyPriceWithGST;
+        console.log(yearlyPlanAmountInPaise);
+        const yealyExtraPrice = extraBlocks * unitPrice;
+        extraPrice = yealyExtraPrice + yearlyPlanAmountInPaise;
+        console.log(extraPrice);
+        newRecuringAmount = block.recurringAmount + yearlyPlanAmountInPaise;
+        recuringAmountCalculation = yearlyPlanAmountInPaise;
+      } else {
+        extraBlocks = newBlockCount - oldBlockCount;
+        extraPrice = extraBlocks * unitPrice;
+        const newUpgradedBlocks = newBlockCount - oldBlockCount; // 3
+        recuringAmountCalculation = newUpgradedBlocks * monthlyPriceWithGST;
+        newRecuringAmount = block.recurringAmount + recuringAmountCalculation;
+      }
+
       razorpayOrder = await razorpay.orders.create({
-        amount: extraPrice * 100,
+        amount: Math.round(extraPrice * 100),
         currency: "INR",
         receipt: `update_receipt_${Date.now()}`,
         payment_capture: 1,
       });
       // console.log("Created razorpay order:", razorpayOrder);
-      block.orderId = razorpayOrder.id;
-      block.paymentStatus = "initiated";
+      // block.orderId = razorpayOrder.id;
+      // block.paymentStatus = "initiated";
       // block.totalAmount = (block.totalAmount || 0) + extraPrice;
-      block.pendingAmount = extraPrice;
+      // block.pendingAmount = extraPrice;
     }
 
-    block.logoUrl = logoUrl || block.logoUrl;
-    block.x = x ?? block.x;
-    block.y = y ?? block.y;
-    block.w = w ?? block.w;
-    block.h = h ?? block.h;
-    block.totalBlocks = newBlockCount;
+    // block.logoUrl = logoUrl || block.logoUrl;
+    // block.x = x ?? block.x;
+    // block.y = y ?? block.y;
+    // block.w = w ?? block.w;
+    // block.h = h ?? block.h;
+    // block.totalBlocks = newBlockCount;
     // await block.save();
+    const lastDoc = await mongoose
+      .model("BrandBlock")
+      .findOne({})
+      .sort({ orderNum: -1 })
+      .select("orderNum");
+    const newOrderNum = lastDoc ? lastDoc.orderNum + 1 : 1;
+
+    const clonedBlock = new BrandBlock({
+      ...block._doc, // clone original
+      _id: undefined, // force new ID
+      brandContactNo: "+919999999999",
+      brandEmailId: "abc@gmail.com",
+      orderNum: newOrderNum,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+
+      // updated fields
+      logoUrl: logoUrl || block.logoUrl,
+      x: x ?? block.x,
+      y: y ?? block.y,
+      w: w ?? block.w,
+      h: h ?? block.h,
+      totalBlocks: newBlockCount,
+      recurringAmount: newRecuringAmount,
+
+      paymentStatus: "initiated",
+      orderId: razorpayOrder.id,
+      pendingAmount: extraPrice,
+    });
+
+    await clonedBlock.save();
+    const addonAmount = Math.round(recuringAmountCalculation * 100); // Convert to paise (integer)
+
+    const addonPayload = {
+      item: {
+        name: "Tile Upgrade Recurring Charge",
+        amount: addonAmount,
+        currency: "INR",
+      },
+      quantity: 1,
+    };
+    if (block.subscriptionId && newRecuringAmount > block.recurringAmount) {
+      await axios.post(
+        `https://api.razorpay.com/v1/subscriptions/${block.subscriptionId}/addons`,
+        addonPayload,
+        {
+          auth: {
+            username: process.env.RAZORPAY_KEY_ID,
+            password: process.env.RAZORPAY_KEY_SECRET,
+          },
+        }
+      );
+
+      clonedBlock.recurringAmount = newRecuringAmount;
+      await clonedBlock.save();
+    }
     return res.status(200).json({
       success: true,
       message: "Block updated successfully",
@@ -1473,6 +1578,7 @@ const updateBlockWithCoords = async (req, res) => {
               amount: razorpayOrder.amount,
               currency: razorpayOrder.currency,
               receipt: razorpayOrder.receipt,
+              type: "order",
             }
           : null,
       },
@@ -1487,6 +1593,7 @@ const verifyPurchase = async (req, res) => {
   try {
     const {
       razorpaySubscriptionId,
+      razorpayOrderId,
       razorpayPaymentId,
       razorpaySignature,
       blockId,
@@ -1496,7 +1603,66 @@ const verifyPurchase = async (req, res) => {
     if (!block) {
       return res.status(404).json({ error: "Block not found." });
     }
-    if (block.orderId !== razorpaySubscriptionId) {
+    console.log(blockId);
+    console.log(razorpayOrderId);
+    if (razorpayOrderId) {
+      const upgradedBlock = await BrandBlock.findOne({
+        orderId: razorpayOrderId,
+      });
+      if (!upgradedBlock) {
+        return res.status(404).json({ error: "Upgrading Block not found." });
+      }
+      // FRONTEND sends order_id → verify using order signature format:
+      // SHA256(order_id + "|" + payment_id)
+      const generatedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest("hex");
+
+      if (generatedSignature !== razorpaySignature) {
+        upgradedBlock.paymentStatus = "failed";
+        await upgradedBlock.save();
+        return res
+          .status(400)
+          .json({ error: "Invalid order payment signature." });
+      }
+
+      // Mark success
+      // upgradedBlock.brandContactNo = block.brandContactNo;
+      // upgradedBlock.brandEmailId = block.brandEmailId;
+
+      upgradedBlock.paymentStatus = "success";
+      upgradedBlock.paymentId = razorpayPaymentId;
+      // Add pending amount → totalAmount
+      upgradedBlock.totalAmount =
+        (upgradedBlock.totalAmount || 0) + (upgradedBlock.pendingAmount || 0);
+      upgradedBlock.initialAmount =
+        (upgradedBlock.totalAmount || 0) + (upgradedBlock.pendingAmount || 0);
+      upgradedBlock.pendingAmount = 0;
+
+      await upgradedBlock.save();
+      block.paymentStatus = "initiated";
+      await block.save();
+      const oldBrandEmail = block.brandEmailId;
+      const oldBrandContact = block.brandContactNo;
+      await BrandBlock.deleteMany({
+        brandEmailId: oldBrandEmail,
+        brandContactNo: oldBrandContact,
+        paymentStatus: "initiated",
+      });
+      upgradedBlock.brandContactNo = oldBrandContact;
+      upgradedBlock.brandEmailId = oldBrandEmail;
+      await upgradedBlock.save();
+      await reflowAllBlocks();
+
+      return res.status(200).json({
+        success: true,
+        message: "Order payment verified successfully.",
+        data: { upgradedBlock },
+      });
+    }
+    //change here from orderId to subscriptionID
+    if (block.subscriptionId !== razorpaySubscriptionId) {
       return res.status(400).json({ error: "Order ID mismatch." });
     }
     if (block.paymentStatus === "success") {
@@ -1517,6 +1683,7 @@ const verifyPurchase = async (req, res) => {
     }
 
     block.paymentId = razorpayPaymentId;
+    //checking razorpay working
     block.paymentStatus = "success";
     let paidAmountINR = 0;
     const razorpaySubscription = await razorpay.subscriptions.fetch(
@@ -1600,6 +1767,70 @@ const verifyPurchase = async (req, res) => {
     return res.status(500).json({ error: "Server error verifying payment." });
   }
 };
+function reflowBlocks(blocks) {
+  const occupiedMap = {};
+  const arranged = [];
+
+  blocks.forEach((block, index) => {
+    const { w, h } = block;
+    let placed = false;
+
+    const rows = Object.keys(occupiedMap).map((n) => parseInt(n, 10));
+    const maxRow = rows.length ? Math.max(...rows) : 0;
+    const scanLimit = maxRow + h;
+
+    outer: for (let y = 0; y <= scanLimit; y++) {
+      for (let x = 0; x <= 20 - w; x++) {
+        let overlap = false;
+
+        for (let row = y; row < y + h; row++) {
+          const rowArr = occupiedMap[row] || Array(20).fill(false);
+          for (let col = x; col < x + w; col++) {
+            if (rowArr[col]) {
+              overlap = true;
+              break;
+            }
+          }
+          if (overlap) break;
+        }
+
+        if (!overlap) {
+          // mark occupied
+          for (let row = y; row < y + h; row++) {
+            if (!occupiedMap[row]) occupiedMap[row] = Array(20).fill(false);
+            for (let col = x; col < x + w; col++) {
+              occupiedMap[row][col] = true;
+            }
+          }
+
+          arranged.push({
+            ...block,
+            x,
+            y,
+            xEnd: x + w,
+            yEnd: y + h,
+            // orderNum assigned AFTER reflow
+          });
+
+          placed = true;
+          break outer;
+        }
+      }
+    }
+
+    if (!placed) {
+      throw new Error(`Grid overflow — cannot place block ${block._id}`);
+    }
+  });
+
+  // Assign final orderNum after placement (top-left first)
+  arranged.forEach((b, i) => {
+    b.orderNum = i + 1;
+  });
+
+  return arranged;
+}
+
 // order history fields for admin/user panel
 const getAllBlocks = async (req, res) => {
   try {
@@ -1762,6 +1993,7 @@ const getAllBlocks = async (req, res) => {
                   brandEmailId: 1,
                   facebookUrl: 1,
                   instagramUrl: 1,
+                  websiteUrl: 1,
                   totalAmount: 1,
                   totalBlocks: 1,
                   orderId: 1,
@@ -1781,6 +2013,7 @@ const getAllBlocks = async (req, res) => {
                   initialAmount: 1,
                   recurringAmount: 1,
                   subscriptionStatus: 1,
+                  subsscriptionPlantType: 1,
                   chargeAt: 1,
                   startAt: 1,
                   endAt: 1,
@@ -1808,12 +2041,27 @@ const getAllBlocks = async (req, res) => {
       const [result = { data: [], total: [] }] = await BrandBlock.aggregate(
         pipeline
       );
-      const blocks = result.data || [];
+      let blocks = result.data;
+
+      blocks.sort((a, b) => {
+        if (a.distanceKm !== b.distanceKm) {
+          return a.distanceKm - b.distanceKm;
+        }
+
+        const areaA = a.w * a.h;
+        const areaB = b.w * b.h;
+        return areaB - areaA;
+      });
+
+      // Now flow them into the grid
+      blocks = reflowBlocks(blocks);
+      // console.log(blocks);
+      // blocks.slice(0, 4).map((item) => console.log(item));
       const total = result.total?.[0]?.count || 0;
 
       return res.json({
         success: true,
-        message: "Blocks fetched successfully",
+        message: "Blocks fetched successfully, considering lat lng",
         data: blocks,
         total,
         page: pageNum,
@@ -1836,7 +2084,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(limitNum)
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus subsscriptionPlantType chargeAt startAt endAt"
       )
       .populate("owner", "name email isBlocked");
     // console.log(blocks);
@@ -1906,7 +2154,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl instagramUrl websiteUrl businessRegistrationNumberGstin description details category location logoUrl x y w h createdAt totalAmount clicks clickDetails initialAmount recurringAmount totalBlocks subscriptionStatus subsscriptionPlantType totalBillingCycles chargeAt startAt endAt"
       )
       .populate({
         path: "clickDetails.userId",
@@ -2033,6 +2281,9 @@ const updateBlocksById = async (req, res) => {
     const {
       brandName,
       brandContactNo,
+      facebookUrl,
+      instagramUrl,
+      websiteUrl,
       brandEmailId,
       businessRegistrationNumberGstin,
       description,
@@ -2046,6 +2297,9 @@ const updateBlocksById = async (req, res) => {
     if (brandName) updates.brandName = brandName;
     if (brandContactNo) updates.brandContactNo = brandContactNo;
     if (brandEmailId) updates.brandEmailId = brandEmailId;
+    if (facebookUrl) updates.facebookUrl = facebookUrl;
+    if (instagramUrl) updates.instagramUrl = instagramUrl;
+    if (websiteUrl) updates.websiteUrl = websiteUrl;
     if (businessRegistrationNumberGstin)
       updates.businessRegistrationNumberGstin = businessRegistrationNumberGstin;
     if (description) updates.description = description;
@@ -2091,8 +2345,14 @@ const recordBrandBlockClick = async (req, res) => {
       });
     }
 
-    // Always increment the click count regardless of same day
+    if (req.user && req.user._id.toString() === block.owner.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "Owners cannot click on their own brand blocks",
+      });
+    }
     block.clicks += 1;
+    await block.save();
 
     // Check if user has already clicked today on this block
     // const today = new Date();
@@ -2119,28 +2379,29 @@ const recordBrandBlockClick = async (req, res) => {
 
       // Add click details to the array (only once)
       block.clickDetails.push(userInfo);
+      await block.save();
       // sendGrid function to send click info
       const user = await User.findById(block.owner._id);
-      // console.log(user);
+      console.log(user);
       await sendEmail({
         to: user.email,
         subject: `You’ve Got a New Lead! Take Action Now`,
         html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2>Hi ${user.name},</h2>
-          <p>Great news — your marketing efforts are paying off! 🎉
-A new lead has just been generated through your account on <strong>BRANDS IN INDIA</strong>.</p>
-          <p>Lead Summary:</p>
-          <p>Name: <strong>${req.user.name}</strong></p>
-          <p>Email:<strong>${req.user.email}</strong></p>
-          <p>Phone:<strong>${req.user.phone || "Not provided"}</strong></p>
-          <p>Regards,<br><strong>Brands In India Team</strong></p>
-        </div>
-      `,
+              <div style="font-family: Arial, sans-serif; color: #333;">
+                <h2>Hi ${user.name},</h2>
+                <p>Great news — your marketing efforts are paying off! 🎉
+      A new lead has just been generated through your account on <strong>BRANDS IN INDIA</strong>.</p>
+                <p>Lead Summary:</p>
+                <p>Name: <strong>${req.user.name}</strong></p>
+                <p>Email:<strong>${req.user.email}</strong></p>
+                <p>Phone:<strong>${
+                  req.user.phone || "Not provided"
+                }</strong></p>
+                <p>Regards,<br><strong>Brands In India Team</strong></p>
+              </div>
+            `,
       });
     }
-
-    await block.save();
 
     // Return redirect URL if available
     if (block.clickUrl) {
@@ -2618,30 +2879,67 @@ const getTimeSeriesAnalytics = async (req, res) => {
 // Webhook payment verify
 const handleRazorpayWebhook = async (req, res) => {
   const now = () => new Date().toISOString();
+  console.log(`${now()} --- Webhook Hit ---`);
+  console.log(`${now()} Headers:, req.headers`);
+  console.log(`${now()} Body:, req.body`);
   try {
-    const rawBody = JSON.stringify(req.body);
+    // req.body is a Buffer when using express.raw()
+    if (!req.body) {
+      console.error(`${now()} Empty request body`);
+      return res.status(400).send("Empty request body");
+    }
+    console.log("THIS IS MY REQUESTED BODY: ", req.body);
+    // req.body is a Buffer when using express.raw()
+    // Use Buffer directly for HMAC to avoid encoding issues
     const signature = req.headers["x-razorpay-signature"];
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const secret = config.razorpay.webhookSecret;
 
     if (!secret) {
       console.error(`${now()} Missing RAZORPAY_WEBHOOK_SECRET`);
       return res.status(500).send("Server misconfigured");
     }
 
+    if (!signature) {
+      console.error(`${now()} Missing x-razorpay-signature header`);
+      return res.status(400).send("Missing signature");
+    }
+
+    // Verify webhook signature using raw body Buffer (more reliable than string conversion)
     const expected = crypto
       .createHmac("sha256", secret)
-      .update(rawBody)
+      .update(req.body)
       .digest("hex");
+
+    // Convert to string for JSON parsing
+    const rawBody = req.body.toString("utf8");
+    console.log("THIS IS MY RAWBODY: ", rawBody);
+    // Debug logging (remove in production)
+    console.log(`${now()} Signature verification:`);
+    console.log(
+      `${now()}   Received signature: ${signature?.substring(0, 20)}...`
+    );
+    console.log(
+      `${now()}   Expected signature: ${expected?.substring(0, 20)}...`
+    );
+    console.log(`${now()}   Raw body length: ${rawBody.length}`);
+    console.log(`${now()}   Raw body preview: ${rawBody.substring(0, 100)}...`);
 
     if (expected !== signature) {
       console.warn(`${now()} Invalid Razorpay webhook signature`);
+      console.warn(`${now()}   Full received: ${signature}`);
+      console.warn(`${now()}   Full expected: ${expected}`);
       return res.status(400).send("Invalid signature");
     }
 
-    const event = req.body.event;
-    const paymentLink = req.body?.payload?.payment_link?.entity;
-    const payment = req.body?.payload?.payment?.entity;
-
+    // Parse the body to access event data
+    const body = JSON.parse(rawBody);
+    console.log("THIS IS MY body: ", body);
+    const event = body.event;
+    console.log("THIS IS MY EVENT: ", event);
+    const paymentLink = body?.payload?.payment_link?.entity;
+    const payment = body?.payload?.payment?.entity;
+    console.log("THIS IS MY PAYMENT LINK: ", paymentLink);
+    console.log("THIS IS MY PAYMENT: ", payment);
     console.log(`${now()} Razorpay webhook received: ${event}`);
 
     //  Handle Payment Link Events
@@ -2655,7 +2953,9 @@ const handleRazorpayWebhook = async (req, res) => {
         paymentLink?.reference_id || payment?.notes?.brandBlockId;
       const paymentId = payment?.id;
       const status = paymentLink?.status || payment?.status;
-
+      console.log("This is my link of payment: ", paymentLinkId);
+      console.log("this is my brandblockID: ", referenceId);
+      console.log("This is my status of payment: ", status);
       if (!referenceId) {
         console.warn(`${now()} Missing reference ID (brandBlockId)`);
         return res.status(200).send("Missing reference ID");
@@ -2694,8 +2994,8 @@ const handleRazorpayWebhook = async (req, res) => {
         const monthlyRecurringAmount = block.totalBlocks * monthlyPriceWithGST;
         const yearlyRecurringAmount = monthlyRecurringAmount * 12;
 
-        const now = new Date();
-        const startAt = new Date(now);
+        const currentDate = new Date();
+        const startAt = new Date(currentDate);
         if (block.subsscriptionPlantType === "monthly") {
           startAt.setMonth(startAt.getMonth() + 1); // start next month
 
@@ -2837,17 +3137,62 @@ const handleRazorpayWebhook = async (req, res) => {
       }
     }
 
-    // Regular Payment
-    const paymentEntity = req.body?.payload?.payment?.entity;
+    // Regular Payment working now ✅✅✅✅
+    const paymentEntity = body?.payload?.payment?.entity;
     if (paymentEntity && event?.startsWith("payment.")) {
+      console.log("My payment entity: -------", paymentEntity);
       const razorpayPaymentId = paymentEntity.id;
       const razorpaySubscriptionId = paymentEntity.subscription_id;
+      const razorpayOrderId = paymentEntity.order_id;
       const status = paymentEntity.status;
+      console.log("This is my razorpayPaymentId: ", razorpayPaymentId);
+      console.log(
+        "This is my razorpaySubscriptionId: ",
+        razorpaySubscriptionId
+      );
+      console.log("This is my status of payment: ", status);
+      // const block = await BrandBlock.findOne({
+      //   orderId: razorpaySubscriptionId,
+      // });
+      // if (paymentEntity.order_id) {
+      //   console.log(
+      //     "🌟 Initial Order Payment Detected:",
+      //     paymentEntity.order_id
+      //   );
 
-      const block = await BrandBlock.findOne({
-        orderId: razorpaySubscriptionId,
-      });
+      //   const subscriptionFromNotes = paymentEntity.notes?.blockId;
 
+      //   if (subscriptionFromNotes) {
+      //     await BrandBlock.findOneAndUpdate(
+      //       { subscriptionId: subscriptionFromNotes },
+      //       {
+      //         orderId: paymentEntity.order_id,
+      //         paymentId: paymentEntity.id,
+      //         paymentStatus: "success",
+      //       }
+      //     );
+      //     console.log("✅ Updated BrandBlock with order payment");
+      //   }
+      // }
+      let block = null;
+
+      // 1. Subscription recurring payment
+      if (razorpaySubscriptionId) {
+        block = await BrandBlock.findOne({
+          subscriptionId: razorpaySubscriptionId,
+        });
+      }
+      if (!block && razorpayOrderId) {
+        block = await BrandBlock.findOne({
+          orderId: razorpayOrderId,
+        });
+      }
+
+      // 2. Initial subscription payment (invoice/order)
+      if (!block && paymentEntity.order_id) {
+        block = await BrandBlock.findOne({ orderId: paymentEntity.order_id });
+      }
+      console.log("This is my: ", block);
       if (!block) {
         console.warn(
           `${now()} ⚠️ No BrandBlock found for subscription ${razorpaySubscriptionId}`
@@ -2860,6 +3205,10 @@ const handleRazorpayWebhook = async (req, res) => {
 
         block.paymentId = razorpayPaymentId;
         block.paymentStatus = "success";
+        block.totalAmount =
+          (block.totalAmount || 0) + (block.pendingAmount || 0);
+
+        block.initialAmount = block.totalAmount;
         block.pendingAmount = 0;
         await block.save();
 
