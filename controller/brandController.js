@@ -3205,6 +3205,10 @@ const handleRazorpayWebhook = async (req, res) => {
 
         block.paymentId = razorpayPaymentId;
         block.paymentStatus = "success";
+        if (block.subsscriptionPlantType === "yearly") {
+          block.totalAmount =
+            (block.totalAmount || 0) + (block.recurringAmount || 0);
+        }
         block.totalAmount =
           (block.totalAmount || 0) + (block.pendingAmount || 0);
 
