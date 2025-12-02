@@ -142,6 +142,12 @@ const BrandBlockSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
+  oldBlockIds: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BrandBlock",
+    },
+  ],
   orderId: {
     type: String,
     default: "",
@@ -216,6 +222,10 @@ const BrandBlockSchema = new mongoose.Schema({
     type: Number,
     required: true,
     default: () => this.w * this.h,
+  },
+  updatedBlocks: {
+    type: Number,
+    default: 0,
   },
   clicks: {
     type: Number,

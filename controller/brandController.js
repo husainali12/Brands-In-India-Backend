@@ -1513,16 +1513,32 @@ const updateBlockWithCoords = async (req, res) => {
       .sort({ orderNum: -1 })
       .select("orderNum");
     const newOrderNum = lastDoc ? lastDoc.orderNum + 1 : 1;
+    try {
+      await BrandBlock.collection.dropIndex("brandEmailId_1");
+      await BrandBlock.collection.dropIndex("brandContactNo_1");
+    } catch (err) {}
+    const previousClones = await BrandBlock.find({
+      owner: block.owner,
+      paymentStatus: "initiated",
+      oldBlockIds: { $exists: true },
+    }).select("_id");
 
+    // 2. Build oldBlockIds array
+    const oldBlockIds = [
+      ...(block.oldBlockIds || []),
+      block._id,
+      ...previousClones.map((c) => c._id),
+    ];
     const clonedBlock = new BrandBlock({
       ...block._doc, // clone original
       _id: undefined, // force new ID
-      brandContactNo: "+919999999999",
-      brandEmailId: "abc@gmail.com",
+      // brandContactNo: block.brandContactNo,
+      // brandEmailId: block.brandEmailId,
       orderNum: newOrderNum,
-      createdAt: new Date(),
+      // createdAt: new Date(),
       updatedAt: new Date(),
-
+      oldBlockIds,
+      updatedBlocks: newBlockCount - oldBlockCount,
       // updated fields
       logoUrl: logoUrl || block.logoUrl,
       x: x ?? block.x,
@@ -1641,20 +1657,27 @@ const verifyPurchase = async (req, res) => {
       upgradedBlock.pendingAmount = 0;
 
       await upgradedBlock.save();
-      block.paymentStatus = "initiated";
-      await block.save();
-      const oldBrandEmail = block.brandEmailId;
-      const oldBrandContact = block.brandContactNo;
-      await BrandBlock.deleteMany({
-        brandEmailId: oldBrandEmail,
-        brandContactNo: oldBrandContact,
-        paymentStatus: "initiated",
-      });
-      upgradedBlock.brandContactNo = oldBrandContact;
-      upgradedBlock.brandEmailId = oldBrandEmail;
+
+      if (upgradedBlock.oldBlockIds && upgradedBlock.oldBlockIds.length > 0) {
+        await BrandBlock.deleteMany({
+          _id: { $in: upgradedBlock.oldBlockIds },
+        });
+      }
+
       await upgradedBlock.save();
       await reflowAllBlocks();
-
+      try {
+        await BrandBlock.collection.createIndex(
+          { brandContactNo_1: 1 },
+          { unique: true }
+        );
+        await BrandBlock.collection.createIndex(
+          { brandEmailId_1: 1 },
+          { unique: true }
+        );
+      } catch (err) {
+        console.error("Error recreating orderNum index:", err);
+      }
       return res.status(200).json({
         success: true,
         message: "Order payment verified successfully.",
@@ -3214,8 +3237,25 @@ const handleRazorpayWebhook = async (req, res) => {
 
         block.initialAmount = block.totalAmount;
         block.pendingAmount = 0;
-        await block.save();
+        if (block.oldBlockIds && block.oldBlockIds.length > 0) {
+          await BrandBlock.deleteMany({
+            _id: { $in: block.oldBlockIds },
+          });
+        }
 
+        await block.save();
+        try {
+          await BrandBlock.collection.createIndex(
+            { brandContactNo_1: 1 },
+            { unique: true }
+          );
+          await BrandBlock.collection.createIndex(
+            { brandEmailId_1: 1 },
+            { unique: true }
+          );
+        } catch (err) {
+          console.error("Error creating indexes:", err);
+        }
         const user = await User.findById(block.owner);
         if (user) {
           await User.findByIdAndUpdate(user._id, {
