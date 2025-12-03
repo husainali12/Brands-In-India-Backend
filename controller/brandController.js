@@ -1555,7 +1555,7 @@ const updateBlockWithCoords = async (req, res) => {
     });
 
     await clonedBlock.save();
-    const addonAmount = recuringAmountCalculation; // Convert to paise (integer)
+    const addonAmount = Math.round(recuringAmountCalculation * 100); // Convert to paise (integer)
     console.log(addonAmount);
     const addonPayload = {
       item: {
