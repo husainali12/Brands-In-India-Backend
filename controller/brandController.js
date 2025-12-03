@@ -1659,9 +1659,10 @@ const verifyPurchase = async (req, res) => {
       await upgradedBlock.save();
 
       if (upgradedBlock.oldBlockIds && upgradedBlock.oldBlockIds.length > 0) {
-        await BrandBlock.deleteMany({
-          _id: { $in: upgradedBlock.oldBlockIds },
-        });
+        await BrandBlock.updateMany(
+          { _id: { $in: upgradedBlock.oldBlockIds } },
+          { $set: { paymentStatus: "initiated" } }
+        );
       }
 
       await upgradedBlock.save();
@@ -1701,7 +1702,8 @@ const verifyPurchase = async (req, res) => {
 
     if (generatedSignature !== razorpaySignature) {
       block.paymentStatus = "failed";
-      await BrandBlock.deleteOne({ _id: blockId });
+      // await BrandBlock.deleteOne({ _id: blockId });
+      await block.save();
       return res.status(400).json({ error: "Invalid payment signature." });
     }
 
@@ -3155,7 +3157,8 @@ const handleRazorpayWebhook = async (req, res) => {
           `${now()}  Payment Link failed/cancelled for ${block._id}`
         );
         block.paymentStatus = "failed";
-        await BrandBlock.deleteOne({ _id: block._id });
+        // await BrandBlock.deleteOne({ _id: block._id });
+        await block.save();
         return res.status(200).send("Payment link failed/cancelled");
       }
     }
@@ -3238,9 +3241,10 @@ const handleRazorpayWebhook = async (req, res) => {
         block.initialAmount = block.totalAmount;
         block.pendingAmount = 0;
         if (block.oldBlockIds && block.oldBlockIds.length > 0) {
-          await BrandBlock.deleteMany({
-            _id: { $in: block.oldBlockIds },
-          });
+          await BrandBlock.updateMany(
+            { _id: { $in: block.oldBlockIds } },
+            { $set: { paymentStatus: "initiated" } }
+          );
         }
 
         await block.save();
@@ -3293,7 +3297,8 @@ const handleRazorpayWebhook = async (req, res) => {
       if (status === "failed" || event === "payment.failed") {
         console.warn(`${now()} Payment failed for ${block._id}`);
         block.paymentStatus = "failed";
-        await BrandBlock.deleteOne({ _id: block._id });
+        // await BrandBlock.deleteOne({ _id: block._id });
+        await block.save();
         return res.status(200).send("Payment failed");
       }
     }
