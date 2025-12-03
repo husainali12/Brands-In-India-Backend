@@ -1555,7 +1555,7 @@ const updateBlockWithCoords = async (req, res) => {
 
     await clonedBlock.save();
     const addonAmount = Math.round(recuringAmountCalculation * 100); // Convert to paise (integer)
-
+    console.log(addonAmount);
     const addonPayload = {
       item: {
         name: "Tile Upgrade Recurring Charge",
@@ -1564,17 +1564,39 @@ const updateBlockWithCoords = async (req, res) => {
       },
       quantity: 1,
     };
+    console.log(addonPayload);
     if (block.subscriptionId && newRecuringAmount > block.recurringAmount) {
-      await axios.post(
-        `https://api.razorpay.com/v1/subscriptions/${block.subscriptionId}/addons`,
-        addonPayload,
-        {
-          auth: {
-            username: process.env.RAZORPAY_KEY_ID,
-            password: process.env.RAZORPAY_KEY_SECRET,
-          },
-        }
-      );
+      let subscriptionStatus = null;
+      try {
+        const subscription = await axios.get(
+          `https://api.razorpay.com/v1/subscriptions/${block.subscriptionId}`,
+          {
+            auth: {
+              username: process.env.RAZORPAY_KEY_ID,
+              password: process.env.RAZORPAY_KEY_SECRET,
+            },
+          }
+        );
+        subscriptionStatus = subscription.data.status;
+        console.log("Subscription Status:", subscriptionStatus);
+      } catch (error) {
+        console.log("Error while fetching subscription status", error);
+      }
+      try {
+        const addOnResponse = await axios.post(
+          `https://api.razorpay.com/v1/subscriptions/${block.subscriptionId}/addons`,
+          addonPayload,
+          {
+            auth: {
+              username: process.env.RAZORPAY_KEY_ID,
+              password: process.env.RAZORPAY_KEY_SECRET,
+            },
+          }
+        );
+        console.log("Addon Created:", addOnResponse.data);
+      } catch (error) {
+        console.log("Error while updating updatig subscription", error);
+      }
 
       clonedBlock.recurringAmount = newRecuringAmount;
       await clonedBlock.save();
