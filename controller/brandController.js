@@ -1484,6 +1484,7 @@ const updateBlockWithCoords = async (req, res) => {
         extraPrice = extraBlocks * unitPrice;
         const newUpgradedBlocks = newBlockCount - oldBlockCount; // 3
         recuringAmountCalculation = newUpgradedBlocks * monthlyPriceWithGST;
+        console.log(recuringAmountCalculation);
         newRecuringAmount = block.recurringAmount + recuringAmountCalculation;
       }
 
@@ -1554,7 +1555,7 @@ const updateBlockWithCoords = async (req, res) => {
     });
 
     await clonedBlock.save();
-    const addonAmount = Math.round(recuringAmountCalculation * 100); // Convert to paise (integer)
+    const addonAmount = recuringAmountCalculation * 100; // Convert to paise (integer)
     console.log(addonAmount);
     const addonPayload = {
       item: {
