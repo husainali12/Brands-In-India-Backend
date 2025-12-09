@@ -1965,7 +1965,9 @@ const getAllBlocks = async (req, res) => {
                           {
                             $sin: {
                               $degreesToRadians: {
-                                $arrayElemAt: ["$location.coordinates", 1],
+                                $toDouble: {
+                                  $arrayElemAt: ["$location.coordinates", 1],
+                                },
                               },
                             },
                           },
@@ -1977,7 +1979,9 @@ const getAllBlocks = async (req, res) => {
                           {
                             $cos: {
                               $degreesToRadians: {
-                                $arrayElemAt: ["$location.coordinates", 1],
+                                $toDouble: {
+                                  $arrayElemAt: ["$location.coordinates", 1],
+                                },
                               },
                             },
                           },
@@ -1987,7 +1991,12 @@ const getAllBlocks = async (req, res) => {
                               $subtract: [
                                 {
                                   $degreesToRadians: {
-                                    $arrayElemAt: ["$location.coordinates", 0],
+                                    $toDouble: {
+                                      $arrayElemAt: [
+                                        "$location.coordinates",
+                                        0,
+                                      ],
+                                    },
                                   },
                                 },
                                 userLngRad,
