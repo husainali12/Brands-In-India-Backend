@@ -20,9 +20,11 @@ const {
   verifySubscriptionPayment,
   handleRazorpayWebhook,
 } = require("../controller/brandController");
+const { getAllJewelersBlocks } = require("../controller/jewlerController");
 const firebaseAuth = require("../middleware/firebaseAuth");
 const router = express.Router();
 router.post("/webhook", express.raw({ type: "*/*" }), handleRazorpayWebhook);
+router.get("/jewelers", getAllJewelersBlocks);
 router.post("/upload-logo", firebaseAuth("any"), uploadLogo);
 router.post("/confirm-placement", firebaseAuth("user"), confirmAndShift);
 router.post("/send-proposal", firebaseAuth("user"), sendProposal);
