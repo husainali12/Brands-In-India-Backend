@@ -103,7 +103,33 @@ const BrandBlockSchema = new mongoose.Schema({
     type: String,
     required: [true, "Logo URL is required"],
   },
-
+  brandImagesUrl: [
+    {
+      key: String,
+      url: String,
+    },
+  ],
+  brandProductsUrl: [
+    {
+      key: String,
+      url: String,
+    },
+  ],
+  brandOverview: {
+    type: String,
+  },
+  brandOpenTime: {
+    type: String,
+  },
+  brandCloseTime: {
+    type: String,
+  },
+  IndustriesWeWorkWith: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BrandBlock",
+    },
+  ],
   w: {
     type: Number,
     required: [true, "Width (w) is required"],

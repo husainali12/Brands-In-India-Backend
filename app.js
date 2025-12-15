@@ -18,6 +18,7 @@ const brandRoutes = require("./routes/brandRoutes");
 const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
 const upComingUserRoutes = require("./routes/UpComingUserRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const brandDetailRoutes = require("./routes/brandDetailEditRoutes");
 
 const app = express();
 mongoose
@@ -57,6 +58,7 @@ app.use("/api/brand", brandRoutes);
 app.use("/api/blockReasons", blockReasonsRoutes);
 app.use("/api/upcoming-user", upComingUserRoutes);
 app.use("/api/employee", employeeRoutes);
+app.use("/api/brand-detail", brandDetailRoutes);
 
 cron.schedule("0 0 * * *", async () => {
   console.log("[Cron] Clearing expired reservations...");
