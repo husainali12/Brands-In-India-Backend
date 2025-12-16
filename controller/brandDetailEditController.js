@@ -1,5 +1,119 @@
 const BrandBlock = require("../model/BrandBlock");
 const catchAsync = require("../utils/catchAsync");
+const cloudinary = require("cloudinary").v2;
+const uploadBrandImages = async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ error: "No file provided." });
+    }
+
+    const files = Array.isArray(req.files.file)
+      ? req.files.file
+      : [req.files.file];
+
+    // 🔒 Validate all files first
+    for (const file of files) {
+      if (!file.mimetype?.startsWith("image")) {
+        return res.status(400).json({
+          error: "Only image files are allowed.",
+        });
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Each image must be less than 10MB.",
+        });
+      }
+
+      if (!file.tempFilePath) {
+        return res.status(400).json({
+          error: "Temporary file path missing.",
+        });
+      }
+    }
+
+    const brandImagesUrl = [];
+
+    for (const file of files) {
+      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+        folder: "brand_images",
+        resource_type: "image",
+      });
+
+      brandImagesUrl.push({
+        key: result.public_id,
+        url: result.secure_url,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      brandImagesUrl,
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    return res.status(500).json({
+      error: "Server error during upload.",
+    });
+  }
+};
+
+const uploadProductImages = async (req, res) => {
+  try {
+    if (!req.files || !req.files.file) {
+      return res.status(400).json({ error: "No file provided." });
+    }
+
+    const files = Array.isArray(req.files.file)
+      ? req.files.file
+      : [req.files.file];
+
+    // 🔒 Validate all files first
+    for (const file of files) {
+      if (!file.mimetype?.startsWith("image")) {
+        return res.status(400).json({
+          error: "Only image files are allowed.",
+        });
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "Each image must be less than 10MB.",
+        });
+      }
+
+      if (!file.tempFilePath) {
+        return res.status(400).json({
+          error: "Temporary file path missing.",
+        });
+      }
+    }
+
+    const brandProductsUrl = [];
+
+    for (const file of files) {
+      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+        folder: "brand_products",
+        resource_type: "image",
+      });
+
+      brandProductsUrl.push({
+        key: result.public_id,
+        url: result.secure_url,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      brandProductsUrl,
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    return res.status(500).json({
+      error: "Server error during upload.",
+    });
+  }
+};
 
 const updateBrandDetailsById = async (req, res) => {
   try {
@@ -20,84 +134,14 @@ const updateBrandDetailsById = async (req, res) => {
       });
     }
 
-    // Handle optional logo file upload
-    let brandImagesUrl = block.brandImagesUrl || [];
-
-    if (req.files && req.files.file) {
-      const files = Array.isArray(req.files.file)
-        ? req.files.file
-        : [req.files.file];
-
-      for (const file of files) {
-        // Validate type
-        if (!file.mimetype.startsWith("image")) {
-          return res
-            .status(400)
-            .json({ error: "Please upload only image files." });
-        }
-
-        // Validate size (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-          return res
-            .status(400)
-            .json({ error: "Each image must be less than 10MB." });
-        }
-
-        // Upload to Cloudinary
-        const result = await cloudinary.uploader.upload(file.tempFilePath, {
-          folder: "brand_images",
-          resource_type: "image",
-        });
-
-        // Push into array
-        brandImagesUrl.push({
-          key: file.name, // or any custom key you want
-          url: result.secure_url,
-        });
-      }
-    }
-
-    let brandProductsUrl = block.brandProductsUrl;
-    if (req.files && req.files.file) {
-      const files = Array.isArray(req.files.file)
-        ? req.files.file
-        : [req.files.file];
-
-      for (const file of files) {
-        // Validate type
-        if (!file.mimetype.startsWith("image")) {
-          return res
-            .status(400)
-            .json({ error: "Please upload only image files." });
-        }
-
-        // Validate size (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-          return res
-            .status(400)
-            .json({ error: "Each image must be less than 10MB." });
-        }
-
-        // Upload to Cloudinary
-        const result = await cloudinary.uploader.upload(file.tempFilePath, {
-          folder: "brand_products",
-          resource_type: "image",
-        });
-
-        // Push into array
-        brandProductsUrl.push({
-          key: file.name, // or any custom key you want
-          url: result.secure_url,
-        });
-      }
-    }
-
     // Prepare updates (only update fields that were sent in body)
     const {
       brandOverview,
       brandOpenTime,
       brandCloseTime,
       IndustriesWeWorkWith,
+      brandImagesUrl,
+      brandProductsUrl,
     } = req.body;
 
     const updates = {};
@@ -110,8 +154,19 @@ const updateBrandDetailsById = async (req, res) => {
     if (brandOpenTime) updates.brandOpenTime = brandOpenTime;
     if (brandOverview) updates.brandOverview = brandOverview;
     if (brandCloseTime) updates.brandCloseTime = brandCloseTime;
-    if (brandProductsUrl) updates.brandProductsUrl = brandProductsUrl;
-    if (brandImagesUrl) updates.brandImagesUrl = brandImagesUrl;
+    if (Array.isArray(brandImagesUrl) && brandImagesUrl.length > 0) {
+      updates.brandImagesUrl = [
+        ...(block.brandImagesUrl || []),
+        ...brandImagesUrl,
+      ];
+    }
+
+    if (Array.isArray(brandProductsUrl) && brandProductsUrl.length > 0) {
+      updates.brandProductsUrl = [
+        ...(block.brandProductsUrl || []),
+        ...brandProductsUrl,
+      ];
+    }
 
     const updatedBlock = await BrandBlock.findByIdAndUpdate(id, updates, {
       new: true,
@@ -133,4 +188,8 @@ const updateBrandDetailsById = async (req, res) => {
   }
 };
 
-module.exports = { updateBrandDetailsById };
+module.exports = {
+  updateBrandDetailsById,
+  uploadBrandImages,
+  uploadProductImages,
+};
