@@ -182,11 +182,12 @@ const confirmAndShift = async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: "Authentication required." });
     }
-    await BrandBlock.deleteMany({
-      brandEmailId,
-      brandContactNo,
-      paymentStatus: "initiated",
-    });
+    if (brandEmailId || brandContactNo) {
+      await BrandBlock.deleteMany({
+        paymentStatus: { $in: ["initiated", "failed"] },
+        $or: [{ brandEmailId }, { brandContactNo }],
+      });
+    }
     const existedBrandEmail = await BrandBlock.findOne({ brandEmailId });
     if (existedBrandEmail) {
       return res.status(401).json({ error: "This Brand Email already exist!" });
@@ -577,11 +578,12 @@ const sendProposal = async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ error: "Authentication required." });
     }
-    await BrandBlock.deleteMany({
-      brandEmailId,
-      brandContactNo,
-      paymentStatus: "initiated",
-    });
+    if (brandEmailId || brandContactNo) {
+      await BrandBlock.deleteMany({
+        paymentStatus: { $in: ["initiated", "failed"] },
+        $or: [{ brandEmailId }, { brandContactNo }],
+      });
+    }
     const existedBrandEmail = await BrandBlock.findOne({ brandEmailId });
     if (existedBrandEmail) {
       return res.status(401).json({ error: "This Brand Email already exist!" });
