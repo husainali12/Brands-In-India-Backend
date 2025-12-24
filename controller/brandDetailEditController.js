@@ -188,8 +188,26 @@ const updateBrandDetailsById = async (req, res) => {
   }
 };
 
+const getbrandDetailsById = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  console.log("Fetching brand details for ID:", id);
+  const brandBlock = await BrandBlock.findById(id);
+
+  if (!brandBlock) {
+    return res.status(404).json({
+      success: false,
+      message: "Brand block not found",
+    });
+  }
+  res.status(200).json({
+    success: true,
+    data: brandBlock,
+  });
+});
+
 module.exports = {
   updateBrandDetailsById,
   uploadBrandImages,
   uploadProductImages,
+  getbrandDetailsById,
 };
