@@ -34,7 +34,7 @@ const getAllJewelersBlocks = async (req, res) => {
     if (country) {
       filter["location.country"] = new RegExp(country, "i");
     }
-    filter.category = "Fashion";
+    // filter.category = "Fashion";
     if (category) {
       if (category.includes(",")) {
         const categories = category.split(",").map((cat) => cat.trim());
