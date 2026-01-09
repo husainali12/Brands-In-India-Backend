@@ -124,6 +124,17 @@ const BrandBlockSchema = new mongoose.Schema({
   brandCloseTime: {
     type: String,
   },
+  seo: {
+    title: {
+      type: String,
+    },
+    description: {
+      type: String,
+    },
+    keywords: {
+      type: String,
+    },
+  },
   IndustriesWeWorkWith: [
     {
       type: mongoose.Schema.Types.ObjectId,

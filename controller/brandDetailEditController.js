@@ -142,6 +142,7 @@ const updateBrandDetailsById = async (req, res) => {
       IndustriesWeWorkWith,
       brandImagesUrl,
       brandProductsUrl,
+      seo,
     } = req.body;
 
     const updates = {};
@@ -167,7 +168,13 @@ const updateBrandDetailsById = async (req, res) => {
         ...brandProductsUrl,
       ];
     }
-
+    if (seo && typeof seo === "object") {
+      updates.seo = {
+        title: seo.title ?? block.seo?.title,
+        description: seo.description ?? block.seo?.description,
+        keywords: seo.keywords ?? block.seo?.keywords,
+      };
+    }
     const updatedBlock = await BrandBlock.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true,
