@@ -1943,7 +1943,7 @@ const getAllBlocks = async (req, res) => {
       const userLngRad = (Math.PI / 180) * userLng;
       const sinUserLat = Math.sin(userLatRad);
       const cosUserLat = Math.cos(userLatRad);
-      const radiusInKm = 500;
+      const radiusInKm = 15200;
       const distanceSortDir = order === "desc" ? -1 : 1;
 
       const baseMatch = {
