@@ -473,7 +473,7 @@ const confirmAndShift = async (req, res) => {
           totalBillingCycles: subscription.total_count || 12,
           paymentStatus: "initiated",
         },
-        { new: true }
+        { new: true },
       );
       // save the details here in brand block schema
 
@@ -818,7 +818,7 @@ const verifyPaymentLink = async (req, res) => {
         payment_link_status: razorpay_payment_link_status,
       },
       razorpay_signature,
-      config.razorpay.keySecret
+      config.razorpay.keySecret,
     );
 
     if (!isValid) {
@@ -993,7 +993,7 @@ const verifyPaymentLink = async (req, res) => {
     await User.findOneAndUpdate(
       { _id: req.user._id },
       { isSubscriptionActive: true },
-      { new: true }
+      { new: true },
     );
 
     const user = await User.findById(req.user._id);
@@ -1012,8 +1012,8 @@ const verifyPaymentLink = async (req, res) => {
         <p>Attached is your invoice for reference.</p>
         <p><strong>Subscription ID:</strong> ${block.subscriptionId}</p>
         <p><strong>Plan:</strong> ${block.subsscriptionPlantType} (${
-            block.totalBlocks
-          } tiles)</p>
+          block.totalBlocks
+        } tiles)</p>
         <p><strong>Total Paid:</strong> ₹${block.totalAmount.toFixed(2)}</p>
         <p>We appreciate your business with <b>Brands In India</b>.</p>
         <br/>
@@ -1079,7 +1079,7 @@ const verifySubscriptionPayment = async (req, res) => {
     });
     await User.findOneAndUpdate(
       { firebaseUid: req.params.id },
-      { isSubscriptionActive: true }
+      { isSubscriptionActive: true },
     );
     if (block) {
       block.paymentStatus = "success";
@@ -1578,7 +1578,7 @@ const updateBlockWithCoords = async (req, res) => {
               username: process.env.RAZORPAY_KEY_ID,
               password: process.env.RAZORPAY_KEY_SECRET,
             },
-          }
+          },
         );
         subscriptionStatus = subscription.data.status;
         console.log("Subscription Status:", subscriptionStatus);
@@ -1594,7 +1594,7 @@ const updateBlockWithCoords = async (req, res) => {
               username: process.env.RAZORPAY_KEY_ID,
               password: process.env.RAZORPAY_KEY_SECRET,
             },
-          }
+          },
         );
         console.log("Addon Created:", addOnResponse.data);
       } catch (error) {
@@ -1686,7 +1686,7 @@ const verifyPurchase = async (req, res) => {
       if (upgradedBlock.oldBlockIds && upgradedBlock.oldBlockIds.length > 0) {
         await BrandBlock.updateMany(
           { _id: { $in: upgradedBlock.oldBlockIds } },
-          { $set: { paymentStatus: "initiated" } }
+          { $set: { paymentStatus: "initiated" } },
         );
       }
 
@@ -1695,11 +1695,11 @@ const verifyPurchase = async (req, res) => {
       try {
         await BrandBlock.collection.createIndex(
           { brandContactNo_1: 1 },
-          { unique: true }
+          { unique: true },
         );
         await BrandBlock.collection.createIndex(
           { brandEmailId_1: 1 },
-          { unique: true }
+          { unique: true },
         );
       } catch (err) {
         console.error("Error recreating orderNum index:", err);
@@ -1737,7 +1737,7 @@ const verifyPurchase = async (req, res) => {
     block.paymentStatus = "success";
     let paidAmountINR = 0;
     const razorpaySubscription = await razorpay.subscriptions.fetch(
-      razorpaySubscriptionId
+      razorpaySubscriptionId,
     );
 
     if (razorpaySubscription?.plan?.item?.amount) {
@@ -1763,7 +1763,7 @@ const verifyPurchase = async (req, res) => {
       const user = await User.findOneAndUpdate(
         userUpdateQuery,
         { isSubscriptionActive: true },
-        { new: true }
+        { new: true },
       );
 
       console.log("Subscription activated for user:", user?.email || "unknown");
@@ -1784,8 +1784,8 @@ const verifyPurchase = async (req, res) => {
         <p>Attached is your invoice for reference.</p>
         <p><strong>Subscription ID:</strong> ${block.subscriptionId}</p>
         <p><strong>Plan:</strong> ${block.subsscriptionPlantType} (${
-            block.totalBlocks
-          } tiles)</p>
+          block.totalBlocks
+        } tiles)</p>
         <p><strong>Total Paid:</strong> ₹${block.totalAmount.toFixed(2)}</p>
         <p>We appreciate your business with <b>Brands In India</b>.</p>
         <br/>
@@ -1805,7 +1805,7 @@ const verifyPurchase = async (req, res) => {
     await reflowAllBlocks();
 
     const finalBlock = await BrandBlock.findById(blockId).select(
-      "_id orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details location logoUrl x y w h initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt"
+      "_id orderNum brandName brandContactNo brandEmailId businessRegistrationNumberGstin description details location logoUrl x y w h initialAmount recurringAmount subscriptionStatus chargeAt startAt endAt",
     );
 
     return res.status(200).json({
@@ -1899,9 +1899,14 @@ const getAllBlocks = async (req, res) => {
       limit = 100,
     } = req.query;
     console.log(lat, lng);
-    const limitNum = Math.max(parseInt(limit, 10) || 1, 1);
-    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const skip = (pageNum - 1) * limitNum;
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitNum = pageNum === 1 ? 100 : 20;
+    let skip;
+    if (pageNum === 1) {
+      skip = 0;
+    } else {
+      skip = 100 + (pageNum - 2) * 20;
+    }
 
     const hasGeoFilters = lat && lng;
     const filter = {};
@@ -2103,9 +2108,8 @@ const getAllBlocks = async (req, res) => {
         },
       ];
 
-      const [result = { data: [], total: [] }] = await BrandBlock.aggregate(
-        pipeline
-      );
+      const [result = { data: [], total: [] }] =
+        await BrandBlock.aggregate(pipeline);
       let blocks = result.data;
 
       blocks.sort((a, b) => {
@@ -2149,7 +2153,7 @@ const getAllBlocks = async (req, res) => {
       .skip(skip)
       .limit(limitNum)
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus subscriptionId brandCloseTime brandOpenTime brandImagesUrl  brandProductsUrl brandOverview subsscriptionPlantType chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus subscriptionId brandCloseTime brandOpenTime brandImagesUrl  brandProductsUrl brandOverview subsscriptionPlantType chargeAt startAt endAt",
       )
       .populate("owner", "name email isBlocked");
     // console.log(blocks);
@@ -2160,7 +2164,7 @@ const getAllBlocks = async (req, res) => {
       total,
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
+      // totalPages: Math.ceil(total / limitNum),
     });
   } catch (err) {
     console.error("Error in getAllBlocks:", err);
@@ -2219,7 +2223,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus brandCloseTime brandOpenTime brandOverview subsscriptionPlantType chargeAt startAt endAt"
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus brandCloseTime brandOpenTime brandOverview subsscriptionPlantType chargeAt startAt endAt",
       )
       .populate({
         path: "clickDetails.userId",
@@ -2269,7 +2273,7 @@ const getBlocksByOwner = async (req, res) => {
         brandName: block.brandName,
         logoUrl: block.logoUrl,
         click,
-      }))
+      })),
     );
     clickRows.sort((a, b) => {
       const aTime = a.click?.clickedAt
@@ -2432,7 +2436,7 @@ const recordBrandBlockClick = async (req, res) => {
     //   );
     // });
     const existingClick = block.clickDetails.find(
-      (click) => click.userId.toString() === req.user._id.toString()
+      (click) => click.userId.toString() === req.user._id.toString(),
     );
     // Only add click details if user hasn't clicked today
     if (!existingClick) {
@@ -2526,14 +2530,14 @@ const getBrandBlockClickAnalytics = async (req, res) => {
     // Calculate analytics
     const totalClicks = block.clicks;
     const uniqueUsers = new Set(
-      block.clickDetails.map((click) => click.userId.toString())
+      block.clickDetails.map((click) => click.userId.toString()),
     ).size;
 
     // Get recent clicks (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentClicks = block.clickDetails.filter(
-      (click) => new Date(click.clickedAt) > thirtyDaysAgo
+      (click) => new Date(click.clickedAt) > thirtyDaysAgo,
     );
 
     // Group clicks by date for chart data
@@ -2553,7 +2557,7 @@ const getBrandBlockClickAnalytics = async (req, res) => {
     const topUsers = Object.entries(userClickCounts)
       .map(([userId, count]) => {
         const userClick = block.clickDetails.find(
-          (click) => click.userId.toString() === userId
+          (click) => click.userId.toString() === userId,
         );
         return {
           userId,
@@ -2928,7 +2932,7 @@ const getTimeSeriesAnalytics = async (req, res) => {
           purchased: "$totalPurchasedTiles",
           revenue: "$revenue",
         },
-      }
+      },
     );
 
     const data = await BrandBlock.aggregate(pipeline);
@@ -2981,10 +2985,10 @@ const handleRazorpayWebhook = async (req, res) => {
     // Debug logging (remove in production)
     console.log(`${now()} Signature verification:`);
     console.log(
-      `${now()}   Received signature: ${signature?.substring(0, 20)}...`
+      `${now()}   Received signature: ${signature?.substring(0, 20)}...`,
     );
     console.log(
-      `${now()}   Expected signature: ${expected?.substring(0, 20)}...`
+      `${now()}   Expected signature: ${expected?.substring(0, 20)}...`,
     );
     console.log(`${now()}   Raw body length: ${rawBody.length}`);
     console.log(`${now()}   Raw body preview: ${rawBody.substring(0, 100)}...`);
@@ -3150,7 +3154,7 @@ const handleRazorpayWebhook = async (req, res) => {
             {
               isSubscriptionActive: true,
             },
-            { new: true }
+            { new: true },
           );
 
           try {
@@ -3164,10 +3168,10 @@ const handleRazorpayWebhook = async (req, res) => {
                 <p>Attached is your invoice for reference.</p>
                 <p><strong>Subscription ID:</strong> ${block.subscriptionId}</p>
                 <p><strong>Plan:</strong> ${block.subsscriptionPlantType} (${
-                block.totalBlocks
-              } tiles)</p>
+                  block.totalBlocks
+                } tiles)</p>
                 <p><strong>Total Paid:</strong> ₹${block.totalAmount.toFixed(
-                  2
+                  2,
                 )}</p>
                 <br/>
                 <p>Regards,<br/>Brands In India Team</p>
@@ -3194,7 +3198,7 @@ const handleRazorpayWebhook = async (req, res) => {
         status === "failed"
       ) {
         console.warn(
-          `${now()}  Payment Link failed/cancelled for ${block._id}`
+          `${now()}  Payment Link failed/cancelled for ${block._id}`,
         );
         block.paymentStatus = "failed";
         // await BrandBlock.deleteOne({ _id: block._id });
@@ -3214,7 +3218,7 @@ const handleRazorpayWebhook = async (req, res) => {
       console.log("This is my razorpayPaymentId: ", razorpayPaymentId);
       console.log(
         "This is my razorpaySubscriptionId: ",
-        razorpaySubscriptionId
+        razorpaySubscriptionId,
       );
       console.log("This is my status of payment: ", status);
       // const block = await BrandBlock.findOne({
@@ -3261,7 +3265,7 @@ const handleRazorpayWebhook = async (req, res) => {
       console.log("This is my: ", block);
       if (!block) {
         console.warn(
-          `${now()} ⚠️ No BrandBlock found for subscription ${razorpaySubscriptionId}`
+          `${now()} ⚠️ No BrandBlock found for subscription ${razorpaySubscriptionId}`,
         );
         return res.status(404).send("Block not found");
       }
@@ -3283,7 +3287,7 @@ const handleRazorpayWebhook = async (req, res) => {
         if (block.oldBlockIds && block.oldBlockIds.length > 0) {
           await BrandBlock.updateMany(
             { _id: { $in: block.oldBlockIds } },
-            { $set: { paymentStatus: "initiated" } }
+            { $set: { paymentStatus: "initiated" } },
           );
         }
 
@@ -3291,11 +3295,11 @@ const handleRazorpayWebhook = async (req, res) => {
         try {
           await BrandBlock.collection.createIndex(
             { brandContactNo_1: 1 },
-            { unique: true }
+            { unique: true },
           );
           await BrandBlock.collection.createIndex(
             { brandEmailId_1: 1 },
-            { unique: true }
+            { unique: true },
           );
         } catch (err) {
           console.error("Error creating indexes:", err);
