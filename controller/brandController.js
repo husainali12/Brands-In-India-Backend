@@ -1900,7 +1900,7 @@ const getAllBlocks = async (req, res) => {
     } = req.query;
     console.log(lat, lng);
     const pageNum = Math.max(parseInt(page) || 1, 1);
-    const limitNum = pageNum === 1 ? 100 : 20;
+    const limitNum = pageNum === 1 ? parseInt(req.query.limit) || 100 : 20;
     let skip;
     if (pageNum === 1) {
       skip = 0;
@@ -2164,7 +2164,7 @@ const getAllBlocks = async (req, res) => {
       total,
       page: pageNum,
       limit: limitNum,
-      // totalPages: Math.ceil(total / limitNum),
+      totalPages: Math.ceil(total / limitNum),
     });
   } catch (err) {
     console.error("Error in getAllBlocks:", err);
