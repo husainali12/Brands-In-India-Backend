@@ -18,6 +18,9 @@ const brandRoutes = require("./routes/brandRoutes");
 const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
 const upComingUserRoutes = require("./routes/UpComingUserRoutes");
 const syncInvoice = require("./routes/syncInvoiceroute");
+const {
+  syncSubscriptionInvoicesService,
+} = require("./service/invoiceSyncService");
 const employeeRoutes = require("./routes/employeeRoutes");
 const brandDetailRoutes = require("./routes/brandDetailEditRoutes");
 
@@ -75,7 +78,15 @@ cron.schedule("0 0 * * *", async () => {
     console.error("[Cron] Error clearing expired reservations:", e);
   }
 });
-
+cron.schedule("0 1 * * *", async () => {
+  console.log("[CRON] Running and syncing subscription invoice...");
+  try {
+    const result = await syncSubscriptionInvoicesService();
+    console.log("[CRON] Invoice Sync Success:", result);
+  } catch (error) {
+    console.error("[CRON] Invoice Sync Failed:", error.message);
+  }
+});
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
