@@ -17,13 +17,14 @@ const biddingRoutes = require("./routes/biddingRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
 const upComingUserRoutes = require("./routes/UpComingUserRoutes");
+const syncInvoice = require("./routes/syncInvoiceroute");
 const employeeRoutes = require("./routes/employeeRoutes");
 const brandDetailRoutes = require("./routes/brandDetailEditRoutes");
 
 const app = express();
 mongoose
   .connect(
-    process.env.MONGODB_URI || "mongodb://localhost:27017/brands-in-india"
+    process.env.MONGODB_URI || "mongodb://localhost:27017/brands-in-india",
   )
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("Failed to connect to MongoDB", err));
@@ -43,7 +44,7 @@ app.use(
   fileUpload({
     useTempFiles: true,
     tempFileDir: "/tmp/",
-  })
+  }),
 );
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -59,13 +60,15 @@ app.use("/api/blockReasons", blockReasonsRoutes);
 app.use("/api/upcoming-user", upComingUserRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/brand-detail", brandDetailRoutes);
-
+app.use("/api/sync", syncInvoice);
 cron.schedule("0 0 * * *", async () => {
   console.log("[Cron] Clearing expired reservations...");
   try {
     const result = await GridSpace.updateMany(
       { status: "reserved", reservationExpiresAt: { $lt: new Date() } },
-      { $set: { status: "available", owner: null, reservationExpiresAt: null } }
+      {
+        $set: { status: "available", owner: null, reservationExpiresAt: null },
+      },
     );
     console.log(`[Cron] Expired reservations cleared: ${result.modifiedCount}`);
   } catch (e) {
