@@ -447,6 +447,12 @@ const confirmAndShift = async (req, res) => {
       /////////////changes here////////////////////
       // console.log(subscription);
       // orderId change from subscription.id ---> firstOrderId
+      let yearAmount = yearlyPlanAmountInPaise / 100;
+      let amount = totalSetupAmount;
+      // console.log(yearAmount);
+      let totalYearAmount = yearAmount + amount;
+      // console.log(amount);
+      // console.log("this is totalyear amount", totalYearAmount);
       await BrandBlock.findByIdAndUpdate(
         newBlock._id,
         {
@@ -466,6 +472,8 @@ const confirmAndShift = async (req, res) => {
             ? new Date(subscription.current_end * 1000)
             : null,
           initialAmount: totalSetupAmount,
+          totalAmount:
+            planType === "yearly" ? totalYearAmount : totalSetupAmount,
           recurringAmount:
             planType === "yearly"
               ? monthlyPriceWithGST * numberOfCells * 12
