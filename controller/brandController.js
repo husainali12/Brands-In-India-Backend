@@ -3343,6 +3343,14 @@ const handleRazorpayWebhook = async (req, res) => {
         }
 
         await reflowAllBlocks();
+        console.log(
+          "This is user's total purchased amount",
+          block?.totalAmount,
+        );
+        console.log(
+          "This is user's total recurring amount",
+          block?.recurringAmount,
+        );
         return res.status(200).send("Payment captured successfully");
       }
 
