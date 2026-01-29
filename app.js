@@ -16,6 +16,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const biddingRoutes = require("./routes/biddingRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
+const panelRoute = require("./routes/panelRoutes");
 const upComingUserRoutes = require("./routes/UpComingUserRoutes");
 const syncInvoice = require("./routes/syncInvoiceroute");
 const {
@@ -61,6 +62,7 @@ app.use("/api/bid", biddingRoutes);
 app.use("/api/brand", brandRoutes);
 app.use("/api/blockReasons", blockReasonsRoutes);
 app.use("/api/upcoming-user", upComingUserRoutes);
+app.use("/api/panel", panelRoute);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/brand-detail", brandDetailRoutes);
 app.use("/api/sync", syncInvoice);
