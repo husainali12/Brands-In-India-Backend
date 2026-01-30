@@ -653,13 +653,13 @@ const sendProposal = async (req, res) => {
     const setupFee = numberOfCells * setupFeeWithGST;
     const monthlyRecurring = numberOfCells * monthlyPriceWithGST;
     const yearlyRecurring = monthlyRecurring * 12;
-
+    let totalAmount;
     if (planType === "yearly") {
       totalAmount = setupFee + yearlyRecurring;
     } else {
       totalAmount = setupFee;
     }
-
+    console.log("THIS WILL BE CUSTOMERS'S TOTAL PURCHASED AMOUNT", totalAmount);
     const { latitude, longitude } = location;
     const locationWithCoordinates = {
       ...location,
@@ -719,6 +719,10 @@ const sendProposal = async (req, res) => {
       callback_url: `${process.env.FRONTEND_URL}/payment-verify-link?blockId=${newBlock._id}`,
       callback_method: "get",
     });
+    console.log(
+      "THESE ARE THE DETAILS WHICH ARE INCLUDED IN PAYMENTLINK",
+      paymentLink,
+    );
 
     // ✅ Step 3: Update block with payment link info
     newBlock.paymentLinkId = paymentLink.id;
