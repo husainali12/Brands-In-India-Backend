@@ -24,9 +24,10 @@
 // };
 
 // module.exports = sendEmail;
-const sgMail = require("@sendgrid/mail");
+const { Resend } = require("resend");
 const fs = require("fs");
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async ({
   to,
@@ -36,32 +37,36 @@ const sendEmail = async ({
   from,
   attachments = [],
 }) => {
-  const msg = {
+  const fromEmail =
+    from || process.env.RESEND_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL;
+
+  const emailPayload = {
+    from: fromEmail,
     to,
-    from: from || process.env.SENDGRID_FROM_EMAIL,
     subject,
-    text: text || " ",
     html,
+    text: text || " ",
   };
 
   // Handle attachments if provided
   if (attachments.length > 0) {
-    msg.attachments = attachments.map((a) => ({
-      content: fs.readFileSync(a.path).toString("base64"),
+    emailPayload.attachments = attachments.map((a) => ({
       filename: a.filename,
-      type: a.type || "application/pdf",
-      disposition: "attachment",
+      content: fs.readFileSync(a.path).toString("base64"),
+      contentType: a.type || "application/pdf",
     }));
   }
 
   try {
-    await sgMail.send(msg);
+    await resend.emails.send(emailPayload);
     console.log(`✅ Email sent to ${to}`);
     return true;
   } catch (error) {
-    console.error("❌ SendGrid error:", error);
-    if (error.response) {
-      console.error(error.response.body);
+    console.error("❌ Resend error:", error);
+    if (error?.response) {
+      console.error(error.response);
+    } else if (error?.message) {
+      console.error(error.message);
     }
     throw new Error("Failed to send email");
   }
