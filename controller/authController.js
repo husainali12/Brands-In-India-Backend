@@ -114,8 +114,6 @@ const phoneLogin = catchAsync(async (req, res) => {
   const userObj = {
     firebaseUid: decodedToken.uid,
     phone,
-    name: decodedToken.name || "",
-    email: decodedToken.email || "",
     role: req.defaultRole || "user",
     // isPhoneVerified: true,
   };
