@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       // required: [true, "Please add an email"],
       unique: true,
+      sparse: true,
       match: [
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
         "Please add a valid email",
@@ -21,6 +22,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       match: [/^\+?[1-9]\d{1,14}$/, "Please add a valid phone number"],
       unique: true,
+      sparse: true,
     },
     photo: {
       type: String,
@@ -60,5 +62,5 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
-
+UserSchema.index({ email: 1 }, { unique: true, sparse: true });
 module.exports = mongoose.model("User", UserSchema);
