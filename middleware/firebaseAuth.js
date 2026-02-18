@@ -19,7 +19,9 @@ const firebaseAuth =
 
         if (!user) {
           if (
-            ["/register", "/signup", "/google-signin"].includes(req.path) ||
+            ["/register", "/signup", "/google-signin", "/phone-login"].includes(
+              req.path,
+            ) ||
             req.path.includes("register")
           ) {
             req.newUser = payload;
@@ -28,8 +30,8 @@ const firebaseAuth =
             reject(
               new ApiError(
                 "User doesn't exist. Please create account",
-                httpStatus.NOT_FOUND
-              )
+                httpStatus.NOT_FOUND,
+              ),
             );
           }
         } else {
@@ -41,8 +43,8 @@ const firebaseAuth =
             reject(
               new ApiError(
                 "You don't have permission to access this resource",
-                httpStatus.FORBIDDEN
-              )
+                httpStatus.FORBIDDEN,
+              ),
             );
           }
 

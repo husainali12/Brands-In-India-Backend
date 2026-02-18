@@ -4,13 +4,13 @@ const UserSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Please add a name"],
+      // required: [true, "Please add a name"],
       trim: true,
       maxlength: [50, "Name can not be more than 50 characters"],
     },
     email: {
       type: String,
-      required: [true, "Please add an email"],
+      // required: [true, "Please add an email"],
       unique: true,
       match: [
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
@@ -58,7 +58,7 @@ const UserSchema = new mongoose.Schema(
     //   default: false,
     // },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("User", UserSchema);

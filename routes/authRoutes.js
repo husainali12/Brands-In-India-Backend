@@ -12,6 +12,7 @@ const {
   blockUser,
   unblockUser,
   googleSignIn,
+  phoneLogin,
   // deleteUser,
   // verifyUser,
   // unverifyUser,
@@ -27,18 +28,19 @@ router.post("/token", validate(verifyToken), generateToken);
 
 router.post("/login", firebaseAuth("any"), loginUser);
 router.post("/google-signin", firebaseAuth("user"), googleSignIn);
+router.post("/phone-login", firebaseAuth("user"), phoneLogin);
 router.post(
   "/register",
   firebaseAuth("user"),
   validate(register),
-  registerUser
+  registerUser,
 );
 
 router.post(
   "/admin-register",
   firebaseAuth("admin"),
   validate(register),
-  registerUser
+  registerUser,
 );
 router.patch("/editUserInfo/:id", firebaseAuth("any"), editUserInfo);
 router.post("/uploadProfilePhoto", firebaseAuth("any"), uploadProfilePhoto);
@@ -48,7 +50,7 @@ router.get("/users", firebaseAuth("admin"), getUsers);
 router.get(
   "/by-firebase-uid/:firebaseUid",
   firebaseAuth("any"),
-  getUserByFirebaseUid
+  getUserByFirebaseUid,
 );
 router.patch("/block-user/:id", firebaseAuth("admin"), blockUser);
 router.patch("/unblock-user/:id", firebaseAuth("admin"), unblockUser);

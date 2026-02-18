@@ -83,6 +83,72 @@ const googleSignIn = catchAsync(async (req, res) => {
     data: user,
   });
 });
+const phoneLogin = catchAsync(async (req, res) => {
+  const { idToken } = req.body;
+  console.log(idToken);
+  if (!idToken) {
+    return res.status(400).json({
+      status: false,
+      message: "ID token is required",
+    });
+  }
+  const decodedToken = await admin.auth().verifyIdToken(idToken);
+  console.log(decodedToken);
+  const phone = decodedToken.phone_number;
+  console.log(phone);
+  if (!phone) {
+    return res.status(400).json({
+      status: false,
+      message: "Invalid phone authentication",
+    });
+  }
+  let user = await authService.findUserByPhone(phone);
+  console.log(user);
+  if (user) {
+    return res.status(200).json({
+      status: true,
+      message: "User logged in successfully with phone",
+      data: user,
+    });
+  }
+  const userObj = {
+    firebaseUid: decodedToken.uid,
+    phone,
+    name: decodedToken.name || "",
+    email: decodedToken.email || "",
+    role: req.defaultRole || "user",
+    // isPhoneVerified: true,
+  };
+  user = await authService.createUser(userObj);
+  if (user) {
+    try {
+      if (user.email) {
+        await sendEmail({
+          to: user.email,
+          subject: "Welcome to Brands in India 🎉",
+          html: `
+            <div style="font-family: Arial, sans-serif; color: #333;">
+              <h2>Welcome!</h2>
+              <p>Your account has been successfully created.</p>
+              <p>You can now explore brands and our services.</p>
+              <br/>
+              <p>Best regards,<br><strong>The Team</strong></p>
+            </div>
+          `,
+        });
+      }
+    } catch (error) {
+      console.error("Email failed:", error);
+    }
+  }
+  return res.status(user ? 201 : 500).json({
+    status: !!user,
+    message: user
+      ? "User registered successfully with phone"
+      : "User registration failed",
+    data: user,
+  });
+});
 const registerUser = catchAsync(async (req, res) => {
   if (req.user) {
     return res.status(409).json({
@@ -137,7 +203,7 @@ const generateToken = catchAsync(async (req, res) => {
         token,
         returnSecureToken: true,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -262,7 +328,7 @@ const uploadProfilePhoto = catchAsync(async (req, res) => {
   if (file.size > 5 * 1024 * 1024) {
     throw new ApiError(
       "Please upload an image less than 5MB",
-      httpStatus.BAD_REQUEST
+      httpStatus.BAD_REQUEST,
     );
   }
 
@@ -284,7 +350,7 @@ const uploadProfilePhoto = catchAsync(async (req, res) => {
   if (!updatedUser) {
     throw new ApiError(
       "Failed to update user profile",
-      httpStatus.INTERNAL_SERVER_ERROR
+      httpStatus.INTERNAL_SERVER_ERROR,
     );
   }
 
@@ -388,6 +454,7 @@ module.exports = {
   blockUser,
   unblockUser,
   googleSignIn,
+  phoneLogin,
   // deleteUser,
   // verifyUser,
   // unverifyUser,

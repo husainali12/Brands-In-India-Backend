@@ -51,6 +51,9 @@ const updateUserById = async (id, updateData) => {
 const findUserByEmail = async (email) => {
   return await User.findOne({ email });
 };
+const findUserByPhone = async (phone) => {
+  return await User.findOne({ phone });
+};
 module.exports = {
   createUser,
   getUserByFirebaseUId,
@@ -58,4 +61,5 @@ module.exports = {
   updateUserById,
   getUsers,
   findUserByEmail,
+  findUserByPhone,
 };
