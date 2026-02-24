@@ -2235,7 +2235,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus brandCloseTime brandOpenTime brandOverview subsscriptionPlantType chargeAt startAt endAt",
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus brandCloseTime brandOpenTime brandOverview subsscriptionPlantType chargeAt views startAt endAt",
       )
       .populate({
         path: "clickDetails.userId",
@@ -2471,7 +2471,7 @@ const recordBrandBlockClick = async (req, res) => {
               <div style="font-family: Arial, sans-serif; color: #333;">
                 <h2>Hi ${user.name},</h2>
                 <p>Great news — your marketing efforts are paying off! 🎉
-      A new lead has just been generated through your account on <strong>BRANDS IN INDIA</strong>.</p>
+                A new lead has just been generated through your account on <strong>BRANDS IN INDIA</strong>.</p>
                 <p>Lead Summary:</p>
                 <p>Name: <strong>${req.user.name}</strong></p>
                 <p>Email:<strong>${req.user.email}</strong></p>
