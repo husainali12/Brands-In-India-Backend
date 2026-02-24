@@ -13,7 +13,7 @@ const createWhoViewedBrandBlock = catchAsync(async (req, res) => {
     throw new ApiError("Brand block ID is required", 400);
   }
   if (req.user._id.toString() === getBrand.owner.toString()) {
-    res.status(201).json({ success: true, data: null });
+    return res.status(201).json({ success: true, data: null });
   }
   const userId = req.user._id;
   const user = await User.findOne({ _id: getBrand.owner });
@@ -50,7 +50,7 @@ const createWhoViewedBrandBlock = catchAsync(async (req, res) => {
               </div>
             `,
   });
-  res.status(201).json({ success: true, data: newView });
+  return res.status(201).json({ success: true, data: newView });
 });
 
 module.exports = { createWhoViewedBrandBlock };
