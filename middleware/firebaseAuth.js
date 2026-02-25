@@ -22,8 +22,7 @@ const firebaseAuth =
             ["/register", "/signup", "/google-signin", "/phone-login"].includes(
               req.path,
             ) ||
-            req.path.includes("register") ||
-            req.path.includes("by-firebase-uid")
+            req.path.includes("register")
           ) {
             req.newUser = payload;
             req.defaultRole = requiredRole === "admin" ? "admin" : "user";
