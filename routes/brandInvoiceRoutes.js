@@ -3,7 +3,7 @@ const {
   syncBrandInvoice,
   getAllBrandInvoice,
   updateBrandInvoice,
-} = require("../controller/BrandInvoiceCotroller");
+} = require("../controller/brandInvoiceCotroller");
 const router = express.Router();
 
 router.get("/sync-brand-invoice", syncBrandInvoice, getAllBrandInvoice);
