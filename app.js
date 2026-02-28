@@ -17,6 +17,7 @@ const biddingRoutes = require("./routes/biddingRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const blockReasonsRoutes = require("./routes/blockReasonsRoutes");
 const panelRoute = require("./routes/panelRoutes");
+const saveEmailRoutes = require("./routes/saveEmailRoutes");
 const brandInvoiceRoutes = require("./routes/brandInvoiceRoutes");
 const upComingUserRoutes = require("./routes/UpComingUserRoutes");
 const viewRoutes = require("./routes/viewRoutes");
@@ -72,6 +73,7 @@ app.use("/api/sync", syncInvoice);
 app.use("/api/brandList", exportListRoutes);
 app.use("/api/view", viewRoutes);
 app.use("/api/brand-invoice", brandInvoiceRoutes);
+app.use("/api/updateUser", saveEmailRoutes);
 cron.schedule("0 0 * * *", async () => {
   console.log("[Cron] Clearing expired reservations...");
   try {
