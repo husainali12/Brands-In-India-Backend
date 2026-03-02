@@ -3274,6 +3274,13 @@ const handleRazorpayWebhook = async (req, res) => {
       if (!block && paymentEntity.order_id) {
         block = await BrandBlock.findOne({ orderId: paymentEntity.order_id });
       }
+      if (
+        !block &&
+        paymentEntity?.notes?.brandBlockId &&
+        paymentEntity?.notes?.planType === "yearly"
+      ) {
+        block = await BrandBlock.findById(paymentEntity.notes.brandBlockId);
+      }
       console.log("This is my: ", block);
       if (!block) {
         console.warn(
