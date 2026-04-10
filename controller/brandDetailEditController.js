@@ -32,19 +32,17 @@ const uploadBrandImages = async (req, res) => {
       }
     }
 
-    const brandImagesUrl = [];
-
-    for (const file of files) {
-      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+    const uploadPromises = files.map((file) => 
+      cloudinary.uploader.upload(file.tempFilePath, {
         folder: "brand_images",
         resource_type: "image",
-      });
-
-      brandImagesUrl.push({
+      }).then((result) => ({
         key: result.public_id,
         url: result.secure_url,
-      });
-    }
+      }))
+    );
+
+    const brandImagesUrl = await Promise.all(uploadPromises);
 
     return res.status(200).json({
       success: true,
@@ -89,19 +87,17 @@ const uploadProductImages = async (req, res) => {
       }
     }
 
-    const brandProductsUrl = [];
-
-    for (const file of files) {
-      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+    const uploadPromises = files.map((file) => 
+      cloudinary.uploader.upload(file.tempFilePath, {
         folder: "brand_products",
         resource_type: "image",
-      });
-
-      brandProductsUrl.push({
+      }).then((result) => ({
         key: result.public_id,
         url: result.secure_url,
-      });
-    }
+      }))
+    );
+
+    const brandProductsUrl = await Promise.all(uploadPromises);
 
     return res.status(200).json({
       success: true,
@@ -212,9 +208,67 @@ const getbrandDetailsById = catchAsync(async (req, res, next) => {
   });
 });
 
+const deleteBrandImages = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { brandImagesUrl } = req.body;
+
+  const brandBlock = await BrandBlock.findByIdAndUpdate(
+    id,
+    {
+      $pull: {
+        brandImagesUrl: { key: { $in: brandImagesUrl } },
+      },
+    },
+    { new: true } // Returns the newly updated document
+  );
+
+  if (!brandBlock) {
+    return res.status(404).json({
+      success: false,
+      message: "Brand block not found",
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Brand images deleted successfully",
+    data: brandBlock,
+  });
+});
+
+const deleteProductImage = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { brandProductsUrl } = req.body;
+
+  const brandBlock = await BrandBlock.findByIdAndUpdate(
+    id,
+    {
+      $pull: {
+        brandProductsUrl: { key: { $in: brandProductsUrl } },
+      },
+    },
+    { new: true }
+  );
+
+  if (!brandBlock) {
+    return res.status(404).json({
+      success: false,
+      message: "Brand block not found",
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Product image deleted successfully",
+    data: brandBlock,
+  });
+});
+
 module.exports = {
   updateBrandDetailsById,
   uploadBrandImages,
   uploadProductImages,
   getbrandDetailsById,
+  deleteBrandImages,
+  deleteProductImage,
 };
