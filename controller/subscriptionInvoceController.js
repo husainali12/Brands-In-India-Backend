@@ -90,9 +90,41 @@ const syncSubscriptionInvoices = catchAsync(async (req, res) => {
 
 const getInvoiceBySubscriptionId = catchAsync(async (req, res) => {
   const { subscriptionId } = req.params;
-  const invoices = await SubscriptionInvoice.find({
+  const { month, year, from, to } = req.query;
+  let filter = {
     subscription_id: subscriptionId,
-  }).sort({ paid_at: 1 });
+  };
+
+  // ✅ Filter by specific month & year
+  if (month && year) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    filter.paid_at = {
+      $gte: startDate,
+      $lte: endDate,
+    };
+  }
+
+  // ✅ Filter by only year
+  else if (year) {
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31, 23, 59, 59);
+
+    filter.paid_at = {
+      $gte: startDate,
+      $lte: endDate,
+    };
+  }
+
+  // ✅ Filter by custom date range
+  else if (from && to) {
+    filter.paid_at = {
+      $gte: new Date(from),
+      $lte: new Date(to),
+    };
+  }
+  const invoices = await SubscriptionInvoice.find(filter).sort({ paid_at: 1 });
   if (!invoices.length) {
     throw new ApiError("No invoices found for this subscription", 404);
   }

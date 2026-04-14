@@ -71,6 +71,10 @@ const getAllBrandInvoice = catchAsync(async (req, res, next) => {
     order = "asc",
     page = 1,
     limit = 10,
+    month,
+    year,
+    from,
+    to,
   } = req.query;
 
   page = parseInt(page, 10);
@@ -103,71 +107,113 @@ const getAllBrandInvoice = catchAsync(async (req, res, next) => {
   const sortStage = {};
   sortStage[sort] = order === "desc" ? -1 : 1;
 
-  const result = await BrandInvoice.aggregate([
-    { $match: matchStage },
-    {
-      $facet: {
-        data: [
-          { $sort: sortStage },
-          { $skip: skip },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "owner",
-            },
+  const pipeline = [{ $match: matchStage }];
+
+  if (month || year || from || to) {
+    let subInvMatch = {};
+    if (month && year) {
+      const parsedYear = parseInt(year);
+      const parsedMonth = parseInt(month);
+      subInvMatch.paid_at = {
+        $gte: new Date(parsedYear, parsedMonth - 1, 1),
+        $lte: new Date(parsedYear, parsedMonth, 0, 23, 59, 59),
+      };
+    } else if (year) {
+      const parsedYear = parseInt(year);
+      subInvMatch.paid_at = {
+        $gte: new Date(parsedYear, 0, 1),
+        $lte: new Date(parsedYear, 11, 31, 23, 59, 59),
+      };
+    } else if (from && to) {
+      subInvMatch.paid_at = {
+        $gte: new Date(from),
+        $lte: new Date(to),
+      };
+    }
+
+    pipeline.push({
+      $lookup: {
+        from: "subscriptioninvoiceschemas",
+        localField: "subscriptionId",
+        foreignField: "subscription_id",
+        as: "subInvoices",
+        pipeline: [
+          { $match: subInvMatch }
+        ]
+      }
+    });
+
+    pipeline.push({
+      $match: {
+        "subInvoices.0": { $exists: true }
+      }
+    });
+  }
+
+  pipeline.push({
+    $facet: {
+      data: [
+        { $sort: sortStage },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "users",
+            localField: "owner",
+            foreignField: "_id",
+            as: "owner",
           },
-          { $unwind: { path: "$owner", preserveNullAndEmptyArrays: true } },
-          {
-            $project: {
-              orderNum: 1,
-              brandName: 1,
-              brandContactNo: 1,
-              brandEmailId: 1,
-              facebookUrl: 1,
-              websiteUrl: 1,
-              instagramUrl: 1,
-              totalAmount: 1,
-              totalBlocks: 1,
-              orderId: 1,
-              paymentId: 1,
-              businessRegistrationNumberGstin: 1,
-              description: 1,
-              details: 1,
-              category: 1,
-              location: 1,
-              logoUrl: 1,
-              x: 1,
-              y: 1,
-              w: 1,
-              h: 1,
-              paymentStatus: 1,
-              initialAmount: 1,
-              recurringAmount: 1,
-              subscriptionStatus: 1,
-              subscriptionId: 1,
-              brandCloseTime: 1,
-              brandOpenTime: 1,
-              brandImagesUrl: 1,
-              brandProductsUrl: 1,
-              brandOverview: 1,
-              subsscriptionPlantType: 1,
-              chargeAt: 1,
-              startAt: 1,
-              endAt: 1,
-              createdAt: 1,
-              "owner.name": 1,
-              "owner.email": 1,
-              "owner.isBlocked": 1,
-            },
+        },
+        { $unwind: { path: "$owner", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            orderNum: 1,
+            brandName: 1,
+            brandContactNo: 1,
+            brandEmailId: 1,
+            facebookUrl: 1,
+            websiteUrl: 1,
+            instagramUrl: 1,
+            totalAmount: 1,
+            totalBlocks: 1,
+            orderId: 1,
+            paymentId: 1,
+            businessRegistrationNumberGstin: 1,
+            description: 1,
+            details: 1,
+            category: 1,
+            location: 1,
+            logoUrl: 1,
+            x: 1,
+            y: 1,
+            w: 1,
+            h: 1,
+            paymentStatus: 1,
+            initialAmount: 1,
+            recurringAmount: 1,
+            subscriptionStatus: 1,
+            subscriptionId: 1,
+            brandCloseTime: 1,
+            brandOpenTime: 1,
+            brandImagesUrl: 1,
+            brandProductsUrl: 1,
+            brandOverview: 1,
+            subsscriptionPlantType: 1,
+            chargeAt: 1,
+            startAt: 1,
+            endAt: 1,
+            createdAt: 1,
+            "owner.name": 1,
+            "owner.email": 1,
+            "owner.isBlocked": 1,
           },
-        ],
-        totalCount: [{ $count: "count" }],
-      },
+        },
+      ],
+      totalCount: [{ $count: "count" }],
     },
-  ]);
+  });
+
+  const result = await BrandInvoice.aggregate(pipeline);
 
   const data = result[0].data;
   const total = result[0].totalCount[0]?.count || 0;
