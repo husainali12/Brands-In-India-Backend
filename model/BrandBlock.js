@@ -98,6 +98,11 @@ const BrandBlockSchema = new mongoose.Schema({
       // required: [true, "Address is required"],
       trim: true,
     },
+    address2: {
+      type: String,
+      trim: true,
+    },
+
   },
   logoUrl: {
     type: String,

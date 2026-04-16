@@ -139,6 +139,7 @@ const updateBrandDetailsById = async (req, res) => {
       brandImagesUrl,
       brandProductsUrl,
       seo,
+      location,
     } = req.body;
 
     const updates = {};
@@ -151,6 +152,7 @@ const updateBrandDetailsById = async (req, res) => {
     if (brandOpenTime) updates.brandOpenTime = brandOpenTime;
     if (brandOverview) updates.brandOverview = brandOverview;
     if (brandCloseTime) updates.brandCloseTime = brandCloseTime;
+
     if (Array.isArray(brandImagesUrl) && brandImagesUrl.length > 0) {
       updates.brandImagesUrl = [
         ...(block.brandImagesUrl || []),
@@ -164,6 +166,7 @@ const updateBrandDetailsById = async (req, res) => {
         ...brandProductsUrl,
       ];
     }
+
     if (seo && typeof seo === "object") {
       updates.seo = {
         title: seo.title ?? block.seo?.title,
@@ -171,6 +174,18 @@ const updateBrandDetailsById = async (req, res) => {
         keywords: seo.keywords ?? block.seo?.keywords,
       };
     }
+
+    if (location && typeof location === "object") {
+      updates.location = {
+        city: location.city ?? block.location?.city,
+        state: location.state ?? block.location?.state,
+        coordinates: location.coordinates ?? block.location?.coordinates,
+        address: location.address ?? block.location?.address,
+        address2: location.address2 ?? block.location?.address2,
+      };
+
+    }
+
     const updatedBlock = await BrandBlock.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true,
