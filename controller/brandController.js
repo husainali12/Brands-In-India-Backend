@@ -199,7 +199,7 @@ const confirmAndShift = async (req, res) => {
         .json({ error: "This Brand Contact already exist!" });
     }
 
-    console.log(planType, duration);
+    // console.log(planType, duration);
     if (
       typeof brandName !== "string" ||
       typeof brandContactNo !== "string" ||
@@ -251,16 +251,18 @@ const confirmAndShift = async (req, res) => {
     const totalSetupAmount = numberOfCells * setupPriceWithGST; // e.g. 4 * 708 = 2832 ₹
     const totalSetupAmountInPaise = Math.round(totalSetupAmount * 100);
 
-    // ✅ Monthly plan price (₹60 + 18% GST = ₹70.8 per tile)
-    const monthlyBasePrice = 60;
-    const monthlyPriceWithGST = monthlyBasePrice * (1 + gstRate); // ₹70.8 per block
+    // ✅ Monthly plan price (₹60 + 18% GST = ₹700.8 per tile)
+    const monthlyBasePrice = 600;
+    const monthlyPriceWithGST = monthlyBasePrice * (1 + gstRate); // ₹700.8 per block
     const monthlyPriceWithGSTInPaise = Math.round(monthlyPriceWithGST * 100);
-    const monthlyPlanAmount = numberOfCells * monthlyPriceWithGSTInPaise; // ₹70.8 × c
+    const monthlyPlanAmount = monthlyPriceWithGSTInPaise; // ₹700.8 × c
 
-    const yearlyPriceWithGST = monthlyPriceWithGST * 12; // e.g. 70.8 * 12
+    const yearlyPriceWithGST = monthlyPriceWithGST * 12; // e.g. 700.8 * 12
     const yearlyPriceWithGSTInPaise = Math.round(yearlyPriceWithGST * 100);
-    const yearlyPlanAmountInPaise = numberOfCells * yearlyPriceWithGSTInPaise; // paise
-
+    const yearlyPlanAmountInPaise = yearlyPriceWithGSTInPaise; // paise
+    console.log("YEARLY PRICE WITH GST", yearlyPriceWithGST);
+    console.log("YEARLY PRICE WITH GST IN PAIGE", yearlyPriceWithGSTInPaise);
+    console.log("YEARLY PLAN AMOUNT IN PAIGE", yearlyPlanAmountInPaise);
     let planPayLoad = {
       period: "monthly",
       interval: 1,
@@ -399,11 +401,13 @@ const confirmAndShift = async (req, res) => {
 
       if (planType === "yearly") {
         // Yearly amount per subscription cycle
-        const yearlyAmount = monthlyPriceWithGST * numberOfCells * 12;
+        const yearlyAmount = monthlyPriceWithGST * 12;
         const yearlyAmountInPaise = Math.round(yearlyAmount * 100);
 
         const initialDeduction = totalSetupAmountInPaise + yearlyAmountInPaise;
-
+        console.log("YEARLY AMOUNT IN PAIGE", yearlyAmountInPaise);
+        console.log("TOTAL SETUP AMOUNT IN PAIGE", totalSetupAmountInPaise);
+        console.log("INITIAL DEDUCTION", initialDeduction);
         addons.push({
           item: {
             name: "Initial Setup Fee + First Year Payment",
@@ -476,8 +480,8 @@ const confirmAndShift = async (req, res) => {
             planType === "yearly" ? totalYearAmount : totalSetupAmount,
           recurringAmount:
             planType === "yearly"
-              ? monthlyPriceWithGST * numberOfCells * 12
-              : numberOfCells * monthlyPriceWithGST,
+              ? monthlyPriceWithGST * 12
+              : monthlyPriceWithGST,
           totalBillingCycles: subscription.total_count || 12,
           paymentStatus: "initiated",
         },
@@ -492,7 +496,7 @@ const confirmAndShift = async (req, res) => {
             id: subscription.id,
             planId: plan.id,
             amount: totalSetupAmount,
-            monthlyAmount: (numberOfCells * monthlyPriceWithGST).toFixed(2),
+            monthlyAmount: monthlyPriceWithGST.toFixed(2),
             currency: "INR",
           },
           blockId: newBlock._id,
@@ -647,11 +651,11 @@ const sendProposal = async (req, res) => {
     const gst = 0.18;
     const setupFeeWithGST = baseSetupFee * (1 + gst); // 708
 
-    const baseMonthlyPrice = 60;
+    const baseMonthlyPrice = 600;
     const monthlyPriceWithGST = baseMonthlyPrice * (1 + gst); // 70.8
 
     const setupFee = numberOfCells * setupFeeWithGST;
-    const monthlyRecurring = numberOfCells * monthlyPriceWithGST;
+    const monthlyRecurring = monthlyPriceWithGST;
     const yearlyRecurring = monthlyRecurring * 12;
     let totalAmount;
     if (planType === "yearly") {
@@ -893,11 +897,11 @@ const verifyPaymentLink = async (req, res) => {
     //   },
     // });
 
-    const baseMonthlyPrice = 60;
+    const baseMonthlyPrice = 600;
     const gst = 0.18;
     const monthlyPriceWithGST = baseMonthlyPrice * (1 + gst); // 70.8
 
-    const monthlyRecurringAmount = block.totalBlocks * monthlyPriceWithGST;
+    const monthlyRecurringAmount = monthlyPriceWithGST;
     const yearlyRecurringAmount = monthlyRecurringAmount * 12;
 
     const now = new Date();
@@ -1445,7 +1449,7 @@ const updateBlockWithCoords = async (req, res) => {
     const baseUnitPrice = 600;
     const gstRate = 0.18;
     const unitPrice = baseUnitPrice + baseUnitPrice * gstRate;
-    const baseMonthlyPrice = 60;
+    const baseMonthlyPrice = 600;
     const monthlyPriceWithGST = baseMonthlyPrice * (1 + gstRate);
     const block = await BrandBlock.findById(blockId);
     if (!block) {
@@ -3068,11 +3072,11 @@ const handleRazorpayWebhook = async (req, res) => {
         // const oneMonthLater = new Date();
         // oneMonthLater.setMonth(now.getMonth() + 1);
         // const startAt = Math.floor(oneMonthLater.getTime() / 1000);
-        const baseMonthlyPrice = 60;
+        const baseMonthlyPrice = 600;
         const gst = 0.18;
         const monthlyPriceWithGST = baseMonthlyPrice * (1 + gst); // 70.8
 
-        const monthlyRecurringAmount = block.totalBlocks * monthlyPriceWithGST;
+        const monthlyRecurringAmount = monthlyPriceWithGST;
         const yearlyRecurringAmount = monthlyRecurringAmount * 12;
 
         const currentDate = new Date();
