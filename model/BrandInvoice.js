@@ -3,11 +3,13 @@ const brandInvoiceSchema = new mongoose.Schema({
   orderNum: {
     type: Number,
     required: true,
+    unique: true,
   },
   brandName: {
     type: String,
     required: [true, "Brand name is required"],
     trim: true,
+    unique: true,
   },
   brandContactNo: {
     type: String,
@@ -167,4 +169,5 @@ const brandInvoiceSchema = new mongoose.Schema({
     default: 0,
   },
 });
+// brandInvoiceSchema.index({ orderNum: 1 }, { unique: true });
 module.exports = mongoose.model("BrandInvoice", brandInvoiceSchema);

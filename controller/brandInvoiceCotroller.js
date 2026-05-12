@@ -2,16 +2,16 @@ const catchAsync = require("../utils/catchAsync.js");
 const ApiError = require("../utils/ApiError");
 const BrandInvoice = require("../model/BrandInvoice.js");
 const BrandBlock = require("../model/BrandBlock.js");
+
+// Synchronize BrandInvoice collection with BrandBlock data
 const syncBrandInvoice = catchAsync(async (req, res, next) => {
   await BrandBlock.aggregate([
     {
-      $match: {
-        paymentStatus: "success",
-      },
+      $match: { paymentStatus: "success" },
     },
     {
       $project: {
-        _id: 0, // prevent _id conflict
+        _id: 0,
         orderNum: 1,
         brandName: 1,
         brandContactNo: 1,
@@ -48,16 +48,16 @@ const syncBrandInvoice = catchAsync(async (req, res, next) => {
     },
     {
       $merge: {
-        into: "brandinvoices", // collection name in lowercase
-        on: "orderNum", // must match your UNIQUE index field
-        whenMatched: "keepExisting",
+        into: "brandinvoices",
+        on: "orderNum",
+        whenMatched: "replace",
         whenNotMatched: "insert",
       },
     },
   ]);
-
   next();
 });
+
 
 const getAllBrandInvoice = catchAsync(async (req, res, next) => {
   let {
