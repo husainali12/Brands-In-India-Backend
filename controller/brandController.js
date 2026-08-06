@@ -2239,7 +2239,7 @@ const getBlocksByOwner = async (req, res) => {
       paymentStatus: "success",
     })
       .select(
-        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus brandCloseTime brandOpenTime brandOverview subsscriptionPlantType chargeAt views startAt endAt",
+        "orderNum brandName brandContactNo brandEmailId facebookUrl websiteUrl createdAt instagramUrl totalAmount totalBlocks orderId paymentId businessRegistrationNumberGstin owner description details category location logoUrl x y w h createdAt paymentStatus initialAmount recurringAmount subscriptionStatus brandCloseTime brandOpenTime brandOverview subsscriptionPlantType chargeAt clickDetails views startAt endAt",
       )
       .populate({
         path: "clickDetails.userId",
@@ -2286,6 +2286,7 @@ const getBlocksByOwner = async (req, res) => {
     clickRows = blocks.flatMap((block) =>
       (block.clickDetails || []).map((click) => ({
         blockId: block._id,
+        clickedAt: click?.clickedAt,
         brandName: block.brandName,
         logoUrl: block.logoUrl,
         click,
@@ -2421,8 +2422,10 @@ const updateBlocksById = async (req, res) => {
 const recordBrandBlockClick = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const block = await BrandBlock.findById(id);
+    const userId = req.user._id;
+    const block = await BrandBlock.findById(id)
+      .select("owner clickUrl")
+      .lean();
     if (!block) {
       return res.status(404).json({
         success: false,
@@ -2430,45 +2433,29 @@ const recordBrandBlockClick = async (req, res) => {
       });
     }
 
-    if (req.user && req.user._id.toString() === block.owner.toString()) {
+    if (block.owner && userId.toString() === block.owner.toString()) {
       return res.status(400).json({
         success: false,
         message: "Owners cannot click on their own brand blocks",
       });
     }
-    block.clicks += 1;
-    await block.save();
 
-    // Check if user has already clicked today on this block
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0); // Start of today
-
-    // const existingClickToday = block.clickDetails.find((click) => {
-    //   const clickDate = new Date(click.clickedAt);
-    //   clickDate.setHours(0, 0, 0, 0); // Start of click day
-    //   return (
-    //     click.userId.toString() === req.user._id.toString() &&
-    //     clickDate.getTime() === today.getTime()
-    //   );
-    // });
-    const existingClick = block.clickDetails.find(
-      (click) => click.userId.toString() === req.user._id.toString(),
+    const firstClickUpdate = await BrandBlock.updateOne(
+      { _id: id, "clickDetails.userId": { $ne: userId } },
+      {
+        $inc: { clicks: 1 },
+        $push: { clickDetails: { userId, clickedAt: new Date() } },
+      },
     );
-    // Only add click details if user hasn't clicked today
-    if (!existingClick) {
-      // Get user information from the authenticated user (MongoDB User object)
-      const userInfo = {
-        userId: req.user._id,
-        clickedAt: new Date(),
-      };
-
-      // Add click details to the array (only once)
-      block.clickDetails.push(userInfo);
-      await block.save();
-      // sendGrid function to send click info
-      const user = await User.findById(block.owner._id);
-      console.log(user);
-      await sendEmail({
+    const existingClick = firstClickUpdate.modifiedCount === 0;
+    if (existingClick) {
+      // User already has a click on record - just bump the counter.
+      await BrandBlock.updateOne({ _id: id }, { $inc: { clicks: 1 } });
+    }
+    if (!existingClick && block.owner) {
+      User.findById(block.owner).then((user) => {
+      if (!user) return;
+      return sendEmail({
         to: user.email,
         subject: `You’ve Got a New Lead! Take Action Now`,
         html: `
@@ -2485,7 +2472,11 @@ const recordBrandBlockClick = async (req, res) => {
                 <p>Regards,<br><strong>Brands In India Team</strong></p>
               </div>
             `,
-      });
+          });
+        })
+        .catch((err) =>
+          console.error("Failed to send new-lead email:", err),
+        );
     }
 
     // Return redirect URL if available
