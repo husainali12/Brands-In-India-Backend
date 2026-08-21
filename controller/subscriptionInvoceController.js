@@ -1,4 +1,5 @@
 const SubscriptionInvoice = require("../model/subscriptionInvoiceSchema");
+const BrandBlock = require("../model/BrandBlock");
 const { fetchSubscriptionInvoices } = require("../service/razorpayservice");
 const { generateInvoiceNumber } = require("../service/InvoiceNumberGenerator");
 const {
@@ -135,4 +136,114 @@ const getInvoiceBySubscriptionId = catchAsync(async (req, res) => {
   });
 });
 
-module.exports = { syncSubscriptionInvoices, getInvoiceBySubscriptionId };
+const getAllSubscriptionStatuses = catchAsync(async (req, res) => {
+  const currentDate = new Date();
+  const oneMonthAgo = new Date(currentDate);
+  oneMonthAgo.setMonth(currentDate.getMonth() - 1);
+
+  const statuses = {
+    paid: [],
+    pending: [],
+    overdue: [],
+    halted: [],
+  };
+
+  // Run aggregation to get latest invoice per subscription, fetch brand info, and project necessary fields
+  const latestInvoices = await SubscriptionInvoice.aggregate([
+    { $sort: { issued_at: -1 } },
+    {
+      $group: {
+        _id: "$subscription_id",
+        doc: { $first: "$$ROOT" },
+      },
+    },
+    { $replaceRoot: { newRoot: "$doc" } },
+    {
+      $lookup: {
+        from: "brandblocks",
+        localField: "subscription_id",
+        foreignField: "subscriptionId",
+        as: "brandInfo",
+      },
+    },
+    {
+      $unwind: {
+        path: "$brandInfo",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $project: {
+        subscription_id: 1,
+        status: 1,
+        issued_at: 1,
+        paid_at: 1,
+        billing_end: 1,
+        amount: 1,
+        currency: 1,
+        contact: "$customer_details.contact",
+        brandDetails: {
+          brandName: "$brandInfo.brandName",
+          brandEmailId: "$brandInfo.brandEmailId",
+        },
+      },
+    },
+  ]);
+
+  latestInvoices.forEach((invoice) => {
+    let currentStatus = "paid";
+
+    if (invoice.status === "halted" || invoice.status === "cancelled") {
+      currentStatus = "halted";
+    } else {
+      const billingEnd = invoice.billing_end
+        ? new Date(invoice.billing_end)
+        : new Date(invoice.paid_at);
+
+      if (billingEnd < oneMonthAgo) {
+        currentStatus = "overdue";
+      } else if (billingEnd < currentDate) {
+        currentStatus = "pending";
+      } else {
+        currentStatus = "paid";
+      }
+    }
+
+    const businessDetails = {
+      subscriptionId: invoice.subscription_id,
+      contact: invoice.contact || "Unknown",
+      status: invoice.status,
+      issuedAt: invoice.issued_at,
+      paidAt: invoice.paid_at,
+      billingEnd: invoice.billing_end,
+      amount: invoice.amount,
+      currency: invoice.currency,
+      brandDetails: invoice.brandDetails?.brandName ? invoice.brandDetails : null,
+      computedStatus: currentStatus,
+    };
+
+    statuses[currentStatus].push(businessDetails);
+  });
+
+  res.status(200).json({
+    success: true,
+    data: statuses,
+    summary: {
+      paidCount: statuses.paid.length,
+      pendingCount: statuses.pending.length,
+      overdueCount: statuses.overdue.length,
+      haltedCount: statuses.halted.length,
+      total:
+        statuses.paid.length +
+        statuses.pending.length +
+        statuses.overdue.length +
+        statuses.halted.length,
+    },
+  });
+});
+
+module.exports = {
+  syncSubscriptionInvoices,
+  getInvoiceBySubscriptionId,
+  getAllSubscriptionStatuses,
+};
