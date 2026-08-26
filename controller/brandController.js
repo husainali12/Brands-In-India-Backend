@@ -14,6 +14,7 @@ const Emloyee = require("../model/Employee");
 const ApiError = require("../utils/ApiError");
 const sendEmail = require("../utils/sendEmail");
 const { generateInvoicePDF } = require("../utils/generateInvoicePDF");
+const SubscriptionHistory = require("../model/subscriptionHistory");
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
   key_secret: config.razorpay.keySecret,
@@ -3367,6 +3368,84 @@ const handleRazorpayWebhook = async (req, res) => {
         await block.save();
         return res.status(200).send("Payment failed");
       }
+    }
+
+    const subscriptionEntity = body?.payload?.subscription?.entity;
+
+    if (subscriptionEntity && event?.startsWith("subscription.")) {
+      console.log('--------------SUBSCRIPTION IS REPAIRING----------------------')
+      const subId = subscriptionEntity.id;
+      const subStatus = subscriptionEntity.status;
+      const blockIdFromNotes = subscriptionEntity.notes?.blockId;
+
+      console.log(`${now()} Subscription event: ${event} | sub: ${subId} | status: ${subStatus}`);
+
+      // Find the block either by the new subscriptionId or via notes.blockId
+      let subBlock = await BrandBlock.findOne({ subscriptionId: subId });
+      if (!subBlock && blockIdFromNotes) {
+        subBlock = await BrandBlock.findById(blockIdFromNotes);
+      }
+
+      if (!subBlock) {
+        console.warn(`${now()} No BrandBlock found for subscription ${subId}`);
+        return res.status(200).send("Block not found for subscription event");
+      }
+
+      if (event === "subscription.activated") {
+        // ── Subscription is now active and AutoPay mandate authorised ────────
+        subBlock.subscriptionId = subId;
+        subBlock.subscriptionStatus = "active";
+        subBlock.planId = subscriptionEntity.plan_id || subBlock.planId;
+        subBlock.startAt = subscriptionEntity.start_at
+          ? new Date(subscriptionEntity.start_at * 1000)
+          : subBlock.startAt;
+        subBlock.chargeAt = subscriptionEntity.charge_at
+          ? new Date(subscriptionEntity.charge_at * 1000)
+          : null;
+        subBlock.nextPaymentDate = subscriptionEntity.current_end
+          ? new Date(subscriptionEntity.current_end * 1000)
+          : null;
+        await subBlock.save();
+
+        // Update SubscriptionHistory so the audit record is complete
+        await SubscriptionHistory.findOneAndUpdate(
+          { newSubscriptionId: subId },
+          { newSubscriptionId: subId },
+          { new: true }
+        );
+
+        // Mark the subscription owner active
+        const subOwner = await User.findById(subBlock.owner);
+        if (subOwner) {
+          await User.findByIdAndUpdate(subOwner._id, { isSubscriptionActive: true });
+        }
+
+        console.log(`${now()} subscription.activated — block ${subBlock._id} is now active.`);
+        return res.status(200).send("Subscription activated");
+      }
+
+      if (event === "subscription.halted") {
+        subBlock.subscriptionStatus = "cancelled"; 
+        await subBlock.save();
+        console.warn(`${now()} subscription.halted — block ${subBlock._id}`);
+        return res.status(200).send("Subscription halted");
+      }
+
+      if (event === "subscription.cancelled") {
+        subBlock.subscriptionStatus = "cancelled";
+        await subBlock.save();
+        console.warn(`${now()} subscription.cancelled — block ${subBlock._id}`);
+        return res.status(200).send("Subscription cancelled");
+      }
+
+      if (event === "subscription.completed") {
+        subBlock.subscriptionStatus = "completed";
+        await subBlock.save();
+        console.log(`${now()} subscription.completed — block ${subBlock._id}`);
+        return res.status(200).send("Subscription completed");
+      }
+      console.log(`${now()} Unhandled subscription event: ${event}`);
+      return res.status(200).send("Subscription event acknowledged");
     }
 
     console.log(`${now()} ℹUnhandled event: ${event}`);
