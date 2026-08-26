@@ -17,6 +17,7 @@ const STATUSES_REQUIRING_CANCEL = new Set([
   "created",
   "authenticated",
   "pending",
+  "paused",
 ]);
 
 /**
@@ -144,10 +145,9 @@ const repairSubscription = catchAsync(async (req, res) => {
           });
         } catch (resumeErr) {
           console.error("Failed to resume paused subscription:", resumeErr);
-          return res.status(500).json({
-            success: false,
-            message: "Failed to resume subscription. Please try again.",
-          });
+          console.log("Falling back to full repair flow (cancel & replace).");
+          // Do NOT return 500. Fall through to the code below which will 
+          // explicitly cancel this paused subscription and create a new one.
         }
       }
 
