@@ -31,6 +31,8 @@ const statusToReason = (status) => {
       return "expired";
     case "halted":
       return "halted";
+    case "paused":
+      return "paused";
     case "payment_failed":
       return "payment_failed";
     case "created":
@@ -42,27 +44,6 @@ const statusToReason = (status) => {
   }
 };
 
-/**
- * POST /api/subscription/repair
- *
- * Generic repair endpoint — called whenever the user clicks the
- * subscription alert action button (regardless of label).
- *
- * Flow:
- *   1. Find the user's BrandBlock by brandBlockId
- *   2. Fetch the old Razorpay subscription
- *   3. Cancel it if it's still "live" (created / authenticated / pending)
- *   4. Archive the old subscription to SubscriptionHistory
- *   5. Create a NEW Razorpay subscription using the same plan_id
- *      (falls back to creating a new plan if planId is missing)
- *   6. Update brandBlock.subscriptionId → new sub ID
- *   7. Return { newSubscriptionId, razorpayKeyId } for the frontend
- *      to open Razorpay Checkout.
- *
- * NOTE: The frontend Checkout is NOT the final source of truth.
- *       The Razorpay webhook (subscription.activated / payment.captured)
- *       is the authoritative confirmation that updates the block status.
- */
 const repairSubscription = catchAsync(async (req, res) => {
   const { brandBlockId } = req.body;
   const userId = req.user._id;
@@ -93,10 +74,7 @@ const repairSubscription = catchAsync(async (req, res) => {
 
   const oldSubscriptionId = block.subscriptionId;
 
-  // ── 2. Determine the plan to use ────────────────────────────────────────
-  // If block.planId is missing (older blocks created before planId was stored),
-  // fall back to creating a brand-new plan from scratch using the block's
-  // subsscriptionPlantType (monthly / yearly) and stored amounts.
+  
   let planIdToUse = block.planId;
 
   if (!planIdToUse) {
@@ -147,6 +125,32 @@ const repairSubscription = catchAsync(async (req, res) => {
         razorpayEndedAt = new Date(oldSub.ended_at * 1000);
       }
 
+      // ── 2a. Handle Instant Resume for Paused Subscriptions ──────────────────
+      if (oldRzpStatus === "paused") {
+        try {
+          await razorpay.subscriptions.resume(oldSubscriptionId, {
+            resume_at: "now",
+          });
+
+          // Update local block state
+          block.subscriptionStatus = "active";
+          await block.save();
+
+          return res.status(200).json({
+            success: true,
+            resumed: true,
+            message: "Subscription resumed successfully.",
+            subscriptionId: oldSubscriptionId
+          });
+        } catch (resumeErr) {
+          console.error("Failed to resume paused subscription:", resumeErr);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to resume subscription. Please try again.",
+          });
+        }
+      }
+
       // Cancel only if the sub is still "live" in Razorpay
       if (STATUSES_REQUIRING_CANCEL.has(oldRzpStatus)) {
         console.log(
@@ -174,8 +178,6 @@ const repairSubscription = catchAsync(async (req, res) => {
     );
   }
 
-  // ── 4. Archive to SubscriptionHistory ───────────────────────────────────
-  // Upsert so retries don't create duplicate history entries for the same old ID
   const historyEntry = await SubscriptionHistory.findOneAndUpdate(
     {
       oldSubscriptionId: oldSubscriptionId || `no-sub-${brandBlockId}`,
@@ -217,10 +219,6 @@ const repairSubscription = catchAsync(async (req, res) => {
   historyEntry.newSubscriptionId = newSub.id;
   await historyEntry.save();
 
-  // Update the block with the new subscription ID.
-  // The webhook (subscription.activated) will be the authoritative confirmation
-  // that sets subscriptionStatus = "active". Here we just store the new ID so
-  // the webhook can look up the block by subscriptionId.
   block.subscriptionId = newSub.id;
   block.subscriptionStatus = newSub.status; // typically "created" at this point
   block.planId = planIdToUse;
