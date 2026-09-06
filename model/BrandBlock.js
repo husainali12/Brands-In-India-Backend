@@ -332,4 +332,8 @@ BrandBlockSchema.pre("save", async function (next) {
   }
 });
 
+// Index for fast paymentStatus lookups (enables index-only count scans → sub-10ms)
+BrandBlockSchema.index({ paymentStatus: 1 });
+
 module.exports = mongoose.model("BrandBlock", BrandBlockSchema);
+
