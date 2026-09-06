@@ -29,6 +29,8 @@ const {
 const employeeRoutes = require("./routes/employeeRoutes");
 const brandDetailRoutes = require("./routes/brandDetailEditRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
+
 
 const app = express();
 mongoose
@@ -76,6 +78,8 @@ app.use("/api/view", viewRoutes);
 app.use("/api/brand-invoice", brandInvoiceRoutes);
 app.use("/api/updateUser", saveEmailRoutes);
 app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/analytics", analyticsRoutes);
+
 cron.schedule("0 0 * * *", async () => {
   console.log("[Cron] Clearing expired reservations...");
   try {
