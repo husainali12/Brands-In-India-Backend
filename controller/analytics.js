@@ -1,21 +1,13 @@
 const BrandBlock = require("../model/BrandBlock");
 
-/**
- * In-memory cache so repeated hits never touch MongoDB.
- * The value is refreshed every CACHE_TTL_MS milliseconds in the background.
- */
-const CACHE_TTL_MS = 60 * 1000; // 1 minute
+const CACHE_TTL_MS = 60 * 1000; 
 
 let cachedCount = null;
 let lastFetchedAt = 0;
-let isFetching = false; // prevents stampede
+let isFetching = false; 
 
-/**
- * Refresh the in-memory cache from MongoDB.
- * Uses countDocuments which hits the paymentStatus index directly (index-only scan).
- */
 async function refreshCache() {
-  if (isFetching) return; // already in-flight
+  if (isFetching) return; 
   isFetching = true;
   try {
     cachedCount = await BrandBlock.countDocuments({ paymentStatus: "success" });
@@ -24,28 +16,19 @@ async function refreshCache() {
     isFetching = false;
   }
 }
-
-// Warm the cache on server startup (non-blocking)
 refreshCache().catch(() => {});
 
-/**
- * GET /api/analytics/total-brands
- *
- * Returns the total number of brands with paymentStatus === "success".
- * Serves from in-memory cache for sub-10ms responses.
- * Cache is refreshed every 60 seconds in the background.
- */
 const getTotalBrandsCount = async (req, res) => {
   try {
     const now = Date.now();
     const isStale = now - lastFetchedAt > CACHE_TTL_MS;
 
-    // If cache is stale, trigger a background refresh (stale-while-revalidate)
+   
     if (isStale) {
       refreshCache().catch(() => {});
     }
 
-    // If cache was never populated (cold start), wait for first fetch
+   
     if (cachedCount === null) {
       await refreshCache();
     }
