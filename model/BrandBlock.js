@@ -273,6 +273,10 @@ const BrandBlockSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  actions:{
+    type: Number,
+    default: 0,
+  },
   clicks: {
     type: Number,
     default: 0,

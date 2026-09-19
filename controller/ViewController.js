@@ -53,4 +53,29 @@ const createWhoViewedBrandBlock = catchAsync(async (req, res) => {
   return res.status(201).json({ success: true, data: newView });
 });
 
-module.exports = { createWhoViewedBrandBlock };
+//ACTION CONTROLL ON BRAND BLOCK
+const recordBrandBlockAction = catchAsync(async (req, res) => {
+  const { brandId } = req.body;
+  if (!brandId) {
+    throw new ApiError("Brand block ID is required", 400);
+  }
+
+  const brand = await Brand.findById(brandId).select("owner actions");
+  if (!brand) {
+    throw new ApiError("Brand block not found", 404);
+  }
+
+  // Don't let an owner's own interactions inflate their own analytics.
+  if (brand.owner && req.user._id.toString() === brand.owner.toString()) {
+    return res.status(200).json({ success: true, data: null });
+  }
+
+  brand.actions += 1;
+  await brand.save();
+
+  return res
+    .status(200)
+    .json({ success: true, data: { actions: brand.actions } });
+});
+
+module.exports = { createWhoViewedBrandBlock, recordBrandBlockAction };
