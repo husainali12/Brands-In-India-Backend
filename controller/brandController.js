@@ -2283,6 +2283,20 @@ const getBlocksByOwner = async (req, res) => {
         },
       },
     ]);
+    const totalActions = await BrandBlock.aggregate([
+      {
+        $match: {
+          owner: new mongoose.Types.ObjectId(ownerId),
+          paymentStatus: "success",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalActions: { $sum: "$actions" },
+        },
+      },
+    ]);
     let clickRows = [];
     clickRows = blocks.flatMap((block) =>
       (block.clickDetails || []).map((click) => ({
@@ -2315,6 +2329,7 @@ const getBlocksByOwner = async (req, res) => {
       data: blocks,
       count: blocks.length,
       totalClicks: totalClicks[0]?.totalClicks || 0,
+      totalActions: totalActions[0]?.totalActions || 0,
       clickRows,
     });
   } catch (err) {
