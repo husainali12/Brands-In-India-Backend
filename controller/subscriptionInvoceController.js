@@ -10,74 +10,102 @@ const ApiError = require("../utils/ApiError");
 
 const syncSubscriptionInvoices = catchAsync(async (req, res) => {
   try {
-    const invoices = await fetchSubscriptionInvoices();
+    // Find the latest paid_at stored in the DB to use as the `from` cursor
+    const latestDoc = await SubscriptionInvoice.findOne(
+      { paid_at: { $exists: true, $ne: null } },
+      { paid_at: 1 },
+    ).sort({ paid_at: -1 });
+
+    // Razorpay `from` expects a Unix timestamp (seconds). paid_at is stored as
+    // a Date object, so convert it. Subtract 1s to avoid missing boundary edge case.
+    const fromTimestamp = latestDoc
+      ? Math.floor(new Date(latestDoc.paid_at).getTime() / 1000) - 1
+      : null;
+
+    const invoices = await fetchSubscriptionInvoices(fromTimestamp);
     let paise = 100;
     let saved = 0;
     let skipped = 0;
+    let duplicates = 0;
     for (const invoice of invoices.sort((a, b) => a.paid_at - b.paid_at)) {
+      // Skip if this Razorpay invoice ID already exists in DB
       const exists = await SubscriptionInvoice.findOne({ inv_id: invoice.id });
       if (exists) {
         skipped++;
         continue;
       }
-      const {
-        invoiceNumber,
-        invoiceSequence,
-        invoiceSubSequence,
-        financialYear,
-      } = await generateInvoiceNumber(invoice.subscription_id, invoice.paid_at);
-      const subscriptionInvoiceCount = await getNextSubscriptionInvoiceCount(
-        invoice.subscription_id,
-      );
-      await SubscriptionInvoice.create({
-        inv_id: invoice.id,
-        subscription_id: invoice.subscription_id,
-        invoice_number: invoiceNumber,
-        invoice_sequence: invoiceSequence,
-        invoice_sub_sequence: invoiceSubSequence,
-        financial_year: financialYear,
-        subscription_invoice_count: subscriptionInvoiceCount,
-        amount: invoice.amount / paise,
-        amount_paid: invoice.amount_paid / paise,
+      try {
+        const {
+          invoiceNumber,
+          invoiceSequence,
+          invoiceSubSequence,
+          financialYear,
+        } = await generateInvoiceNumber(invoice.subscription_id, invoice.paid_at);
+        const subscriptionInvoiceCount = await getNextSubscriptionInvoiceCount(
+          invoice.subscription_id,
+        );
+        await SubscriptionInvoice.create({
+          inv_id: invoice.id,
+          subscription_id: invoice.subscription_id,
+          invoice_number: invoiceNumber,
+          invoice_sequence: invoiceSequence,
+          invoice_sub_sequence: invoiceSubSequence,
+          financial_year: financialYear,
+          subscription_invoice_count: subscriptionInvoiceCount,
+          amount: invoice.amount / paise,
+          amount_paid: invoice.amount_paid / paise,
 
-        billing_start: invoice.billing_start,
-        billing_end: invoice.billing_end,
-        created_at: invoice.created_at,
-        issued_at: invoice.issued_at,
-        paid_at: invoice.paid_at,
+          billing_start: invoice.billing_start,
+          billing_end: invoice.billing_end,
+          created_at: invoice.created_at,
+          issued_at: invoice.issued_at,
+          paid_at: invoice.paid_at,
 
-        currency: invoice.currency,
-        currency_symbol: invoice.currency_symbol,
+          currency: invoice.currency,
+          currency_symbol: invoice.currency_symbol,
 
-        customer_details: {
-          name: invoice.customer_details?.name,
-          email: invoice.customer_details?.email,
-          contact: invoice.customer_details?.contact,
-          gstin: invoice.customer_details?.gstin,
-        },
+          customer_details: {
+            name: invoice.customer_details?.name,
+            email: invoice.customer_details?.email,
+            contact: invoice.customer_details?.contact,
+            gstin: invoice.customer_details?.gstin,
+          },
 
-        order_id: invoice.order_id,
-        payment_id: invoice.payment_id,
-        short_url: invoice.short_url,
+          order_id: invoice.order_id,
+          payment_id: invoice.payment_id,
+          short_url: invoice.short_url,
 
-        status: invoice.status,
+          status: invoice.status,
 
-        line_items: invoice.line_items?.map((item) => ({
-          name: item.name,
-          amount: item.amount,
-          quantity: item.quantity,
-          unit_amount: item.unit_amount,
-          taxable_amount: item.taxable_amount,
-        })),
-      });
-
-      saved++;
+          line_items: invoice.line_items?.map((item) => ({
+            name: item.name,
+            amount: item.amount,
+            quantity: item.quantity,
+            unit_amount: item.unit_amount,
+            taxable_amount: item.taxable_amount,
+          })),
+        });
+        saved++;
+      } catch (insertErr) {
+        // Gracefully skip duplicate invoice_number or inv_id conflicts
+        if (insertErr.code === 11000) {
+          console.warn(
+            `Duplicate key skipped for Razorpay invoice ${invoice.id}:`,
+            insertErr.keyValue,
+          );
+          duplicates++;
+        } else {
+          // Re-throw unexpected errors
+          throw insertErr;
+        }
+      }
     }
     return res.json({
       success: true,
       message: "Subscription invoices synced",
       saved,
       skipped,
+      duplicates,
       totalFetched: invoices.length,
     });
   } catch (error) {

@@ -7,16 +7,19 @@ const razorpay = new Razorpay({
   key_secret: config.razorpay.keySecret,
 });
 
-const fetchSubscriptionInvoices = async () => {
+const fetchSubscriptionInvoices = async (fromTimestamp = null) => {
   const invoices = [];
   let skip = 0;
   const count = 100;
 
   while (true) {
-    const response = await razorpay.invoices.all({
-      count,
-      skip,
-    });
+    const params = { count, skip };
+    // Only fetch invoices newer than the latest already stored
+    if (fromTimestamp) {
+      params.from = fromTimestamp;
+    }
+
+    const response = await razorpay.invoices.all(params);
     if (!response || !response.items) {
       throw new ApiError("Failed to fetch invoices from Razorpay", 404);
     }
@@ -27,7 +30,7 @@ const fetchSubscriptionInvoices = async () => {
     invoices.push(...response.items);
     skip += count;
   }
-  console.log(invoices.length);
+  console.log(`Fetched ${invoices.length} invoices from Razorpay (from: ${fromTimestamp ?? "all time"})`);
   return invoices.filter((inv) => inv.subscription_id && inv.status === "paid");
   //   const inv = invoices.filter(
   //     (inv) => inv.subscription_id && inv.status === "paid",

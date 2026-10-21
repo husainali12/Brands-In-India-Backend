@@ -41,6 +41,13 @@ const generateInvoiceNumber = async (subscriptionId, paidAt) => {
     const base = previousInvoices[0].invoice_number;
     subSeq = previousInvoices.length;
     invoiceNumber = `${base}.${subSeq}`;
+
+    // Guard: if that invoice_number already exists (e.g. from a previous
+    // partial sync), keep incrementing until we find a free slot
+    while (await SubscriptionInvoice.findOne({ invoice_number: invoiceNumber })) {
+      subSeq++;
+      invoiceNumber = `${base}.${subSeq}`;
+    }
   }
 
   return {
